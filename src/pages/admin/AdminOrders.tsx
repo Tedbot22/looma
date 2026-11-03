@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { MapPin, MessageCircle, Phone } from 'lucide-react'
+import { MapPin, MessageCircle, Phone, Route } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { formatNaira } from '../../lib/format'
 import { whatsappLinkTo } from '../../lib/whatsapp'
+import { formatKm, routeUrl } from '../../lib/delivery'
 import type { OrderWithItems } from '../../lib/types'
 
 type AdminOrder = OrderWithItems & {
@@ -14,6 +15,7 @@ type AdminOrder = OrderWithItems & {
 const TABS = [
   { key: 'placed', label: 'New' },
   { key: 'confirmed', label: 'Confirmed' },
+  { key: 'out_for_delivery', label: 'On the way' },
   { key: 'delivered', label: 'Delivered' },
   { key: 'cancelled', label: 'Cancelled' },
   { key: 'all', label: 'All' },
@@ -23,6 +25,7 @@ const STATUS_STYLE: Record<OrderWithItems['status'], string> = {
   pending_payment: 'bg-gray-100 text-gray-600',
   placed: 'bg-blue-100 text-blue-700',
   confirmed: 'bg-amber-100 text-amber-700',
+  out_for_delivery: 'bg-purple-100 text-purple-700',
   delivered: 'bg-green-100 text-green-700',
   cancelled: 'bg-red-100 text-red-700',
 }
@@ -31,6 +34,7 @@ const STATUS_LABEL: Record<OrderWithItems['status'], string> = {
   pending_payment: 'Awaiting payment',
   placed: 'New',
   confirmed: 'Confirmed',
+  out_for_delivery: 'Out for delivery',
   delivered: 'Delivered',
   cancelled: 'Cancelled',
 }
@@ -70,8 +74,20 @@ export default function AdminOrders() {
   })
 
   const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: 'confirmed' | 'delivered' | 'cancelled' }) => {
-      const { error } = await supabase.rpc('set_order_status', { p_order_id: id, p_status: status })
+    mutationFn: async ({
+      id,
+      status,
+      note,
+    }: {
+      id: string
+      status: 'confirmed' | 'out_for_delivery' | 'delivered' | 'cancelled'
+      note?: string
+    }) => {
+      const { error } = await supabase.rpc('set_order_status', {
+        p_order_id: id,
+        p_status: status,
+        p_note: note ?? null,
+      })
       if (error) throw error
     },
     onSuccess: () => {
@@ -80,6 +96,13 @@ export default function AdminOrders() {
     },
     onError: (err) => toast.error(friendlyError((err as Error).message)),
   })
+
+  // The note is shown to the customer on their tracking page (e.g. who is bringing the order).
+  function sendOut(order: AdminOrder) {
+    const note = window.prompt('Note for the customer (optional), e.g. rider name and phone number:')
+    if (note === null) return // cancelled
+    updateStatus.mutate({ id: order.id, status: 'out_for_delivery', note })
+  }
 
   function cancel(order: AdminOrder) {
     if (!window.confirm(`Cancel order #${order.order_number}? Its items will go back into stock.`)) return
@@ -163,8 +186,30 @@ export default function AdminOrders() {
                   <Phone size={14} className="shrink-0 text-gray-400" /> {order.phone}
                 </p>
                 <p className="flex items-start gap-2">
-                  <MapPin size={14} className="mt-0.5 shrink-0 text-gray-400" /> {order.delivery_address}
+                  <MapPin size={14} className="mt-0.5 shrink-0 text-gray-400" />
+                  <span>
+                    {order.delivery_zone && <span className="font-medium text-gray-900">{order.delivery_zone}</span>}
+                    {order.delivery_zone && order.delivery_address ? ': ' : ''}
+                    {order.delivery_address}
+                  </span>
                 </p>
+                {order.delivery_note && (
+                  <p className="pl-6 text-sm text-gray-600">Note: {order.delivery_note}</p>
+                )}
+                {order.delivery_lat != null && order.delivery_lon != null && (
+                  <p className="pl-6 text-xs text-gray-400">
+                    Location: {order.delivery_lat}, {order.delivery_lon}
+                    {order.delivery_distance_m != null && ` · ${formatKm(order.delivery_distance_m)} from the store`}
+                  </p>
+                )}
+                {order.delivery_fee > 0 && (
+                  <p className="pl-6 text-xs text-gray-400">Includes {formatNaira(order.delivery_fee)} delivery fee</p>
+                )}
+                {order.discount > 0 && (
+                  <p className="pl-6 text-xs font-medium text-green-700">
+                    Voucher used: {formatNaira(order.discount)} off (already taken off the total)
+                  </p>
+                )}
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
@@ -177,6 +222,23 @@ export default function AdminOrders() {
                   <MessageCircle size={15} /> Message customer
                 </a>
 
+                {order.delivery_lat != null &&
+                  order.delivery_lon != null &&
+                  order.origin_lat != null &&
+                  order.origin_lon != null && (
+                    <a
+                      href={routeUrl(
+                        { lat: order.origin_lat, lon: order.origin_lon },
+                        { lat: order.delivery_lat, lon: order.delivery_lon }
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:border-brand"
+                    >
+                      <Route size={15} /> View route
+                    </a>
+                  )}
+
                 {order.status === 'placed' && (
                   <button
                     disabled={updateStatus.isPending}
@@ -187,6 +249,15 @@ export default function AdminOrders() {
                   </button>
                 )}
                 {(order.status === 'placed' || order.status === 'confirmed') && (
+                  <button
+                    disabled={updateStatus.isPending}
+                    onClick={() => sendOut(order)}
+                    className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-60"
+                  >
+                    Out for delivery
+                  </button>
+                )}
+                {(order.status === 'placed' || order.status === 'confirmed' || order.status === 'out_for_delivery') && (
                   <button
                     disabled={updateStatus.isPending}
                     onClick={() => updateStatus.mutate({ id: order.id, status: 'delivered' })}

@@ -29,16 +29,6 @@ export interface ProductVariant {
   is_active: boolean
 }
 
-export interface Bundle {
-  id: string
-  name: string
-  description: string | null
-  price: number
-  compare_at_price: number | null
-  images: string[]
-  is_active: boolean
-}
-
 // A product together with its variants, as returned by:
 //   supabase.from('products').select('*, product_variants(*)')
 export interface ProductWithVariants extends Product {
@@ -49,7 +39,6 @@ export interface OrderItem {
   id: string
   order_id: string
   variant_id: string | null
-  bundle_id: string | null
   name: string
   quantity: number
   unit_price: number
@@ -61,13 +50,58 @@ export interface Order {
   user_id: string
   total: number
   payment_method: 'online' | 'on_delivery'
-  payment_status: 'pending' | 'paid' | 'failed'
-  status: 'pending_payment' | 'placed' | 'confirmed' | 'delivered' | 'cancelled'
+  payment_status: 'pending' | 'paid' | 'failed' | 'refunded'
+  status: 'pending_payment' | 'placed' | 'confirmed' | 'out_for_delivery' | 'delivered' | 'cancelled'
+  subtotal: number
+  delivery_fee: number
+  delivery_zone: string | null
+  discount: number
   delivery_address: string
+  delivery_note: string | null
+  delivery_lat: number | null
+  delivery_lon: number | null
+  delivery_distance_m: number | null
+  origin_lat: number | null
+  origin_lon: number | null
   phone: string
+  expires_at: string | null
+  payment_reference: string | null
   created_at: string
 }
 
 export interface OrderWithItems extends Order {
   order_items: OrderItem[]
+}
+
+// One step in an order's history (what the tracking timeline is built from).
+export interface OrderEvent {
+  id: string
+  order_id: string
+  status: Order['status']
+  note: string | null
+  created_at: string
+}
+
+// A campus LOOMA delivers to, with its delivery fee.
+export interface DeliveryZone {
+  id: string
+  name: string
+  fee: number
+  is_active: boolean
+  sort_order: number
+  kind: 'campus' | 'home' // campus = ready-made option; home = customer enters an address
+}
+
+// A customer's saved delivery location: a campus plus their own details (hostel, room, landmark).
+export interface SavedAddress {
+  id: string
+  zone_id: string
+  details: string // the address text the customer picked from the suggestions
+  latitude: number
+  longitude: number
+  note: string | null // optional landmark or extra directions
+  is_default: boolean
+  created_at: string
+  // null when the campus has since been switched off (Row Level Security hides inactive zones)
+  delivery_zones: DeliveryZone | null
 }

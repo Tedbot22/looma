@@ -7,4 +7,4 @@ export const STORE_NAME = 'LOOMA' // TODO: the client's real store name
 export const WHATSAPP_NUMBER = '2308145043953' // TODO: replace with the owner's real number
 
 // Where an invite code (from a ?ref=CODE link) is remembered until the visitor signs up.
-export const REFERRAL_KEY = 'thrift-ref'
+export const REFERRAL_KEY = 'looma-ref'

@@ -1,21 +1,35 @@
-import { useQuery } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
-import { CheckCircle2, MessageCircle } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
+import { CheckCircle2, Clock, MessageCircle } from 'lucide-react'
+import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { formatNaira } from '../lib/format'
 import { whatsappLink } from '../lib/whatsapp'
-import type { OrderWithItems } from '../lib/types'
+import { startPayment, verifyPayment } from '../lib/payments'
+import OrderTimeline from '../components/OrderTimeline'
+import type { OrderEvent, OrderWithItems } from '../lib/types'
 
 const STATUS_LABEL: Record<OrderWithItems['status'], string> = {
   pending_payment: 'Awaiting payment',
   placed: 'Order received',
   confirmed: 'Confirmed',
+  out_for_delivery: 'Out for delivery',
   delivered: 'Delivered',
   cancelled: 'Cancelled',
 }
 
 export default function OrderConfirmation() {
   const { orderId } = useParams()
+  const queryClient = useQueryClient()
+  const location = useLocation()
+  const [params, setParams] = useSearchParams()
+  const [paying, setPaying] = useState(false)
+  const verifying = useRef(false)
+
+  const justOrdered = (location.state as { justOrdered?: boolean } | null)?.justOrdered === true
+  // Paystack sends the customer back with ?reference=... (and ?trxref=...).
+  const reference = params.get('reference') ?? params.get('trxref')
 
   const {
     data: order,
@@ -34,7 +48,78 @@ export default function OrderConfirmation() {
       return data as OrderWithItems | null
     },
     enabled: !!orderId,
+    // While we wait for a payment to be confirmed, check every few seconds.
+    refetchInterval: (query) => (query.state.data?.status === 'pending_payment' ? 4000 : false),
   })
+
+  const { data: events = [] } = useQuery({
+    queryKey: ['order-events', orderId],
+    queryFn: async (): Promise<OrderEvent[]> => {
+      const { data, error } = await supabase
+        .from('order_events')
+        .select('*')
+        .eq('order_id', orderId!)
+        .order('created_at')
+      if (error) throw error
+      return data as OrderEvent[]
+    },
+    enabled: !!orderId,
+  })
+
+  // LIVE TRACKING: when the store changes this order, refresh instantly (no reload needed).
+  useEffect(() => {
+    if (!orderId) return
+    const channel = supabase
+      .channel(`order-${orderId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['order', orderId] })
+          queryClient.invalidateQueries({ queryKey: ['order-events', orderId] })
+        }
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [orderId, queryClient])
+
+  // Just came back from Paystack? Ask the server to confirm the payment right away.
+  useEffect(() => {
+    if (!orderId || !reference || verifying.current) return
+    verifying.current = true
+
+    verifyPayment(orderId, reference)
+      .then((result) => {
+        if (result.status === 'paid' || result.status === 'already_paid') {
+          toast.success('Payment received. Thank you!')
+        } else if (result.status === 'not_paid') {
+          toast.error("We couldn't confirm a payment. If you were charged, it will be sorted out shortly.")
+        } else if (result.status === 'refunded') {
+          toast.error('Your order expired before the payment arrived, so the payment was refunded.')
+        } else {
+          toast.error(result.message ?? 'We could not confirm your payment yet.')
+        }
+      })
+      .catch((err) => toast.error((err as Error).message))
+      .finally(() => {
+        queryClient.invalidateQueries({ queryKey: ['order', orderId] })
+        queryClient.invalidateQueries({ queryKey: ['order-events', orderId] })
+        setParams({}, { replace: true }) // tidy the address bar
+      })
+  }, [orderId, reference, queryClient, setParams])
+
+  async function payNow() {
+    if (!orderId) return
+    setPaying(true)
+    try {
+      window.location.href = await startPayment(orderId)
+    } catch (err) {
+      toast.error((err as Error).message)
+      setPaying(false)
+    }
+  }
 
   if (isLoading) return <p className="py-20 text-center text-gray-400">Loading your order…</p>
   if (error || !order) {
@@ -49,22 +134,57 @@ export default function OrderConfirmation() {
   }
 
   const careMessage = `Hi! I have a question about my order #${order.order_number} (ID: ${order.id}).`
+  const awaitingPayment = order.status === 'pending_payment'
+  const holdUntil = order.expires_at
+    ? new Date(order.expires_at).toLocaleTimeString('en-NG', { timeStyle: 'short' })
+    : null
 
   return (
     <div className="mx-auto max-w-xl">
       <div className="text-center">
-        <CheckCircle2 className="mx-auto text-green-600" size={48} />
-        <h1 className="mt-3 text-2xl font-bold">Thank you! Your order is in.</h1>
+        {order.status === 'cancelled' ? null : awaitingPayment ? (
+          <Clock className="mx-auto text-amber-500" size={44} />
+        ) : (
+          <CheckCircle2 className="mx-auto text-green-600" size={48} />
+        )}
+        <h1 className="mt-3 text-2xl font-bold">
+          {awaitingPayment
+            ? 'Complete your payment'
+            : order.status === 'cancelled'
+              ? `Order #${order.order_number} was cancelled`
+              : justOrdered
+                ? 'Thank you! Your order is in.'
+                : `Order #${order.order_number}`}
+        </h1>
         <p className="mt-1 text-gray-500">
-          Order <span className="font-semibold">#{order.order_number}</span> ·{' '}
-          {STATUS_LABEL[order.status]}
-        </p>
-        <p className="mt-2 text-sm text-gray-500">
-          We'll contact you on {order.phone} to confirm delivery.
+          Order <span className="font-semibold">#{order.order_number}</span> · {STATUS_LABEL[order.status]}
         </p>
       </div>
 
-      <div className="mt-8 space-y-4 rounded-xl bg-gray-50 p-5">
+      {awaitingPayment && (
+        <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-center">
+          <p className="text-sm text-amber-900">
+            Your items are reserved{holdUntil ? ` until ${holdUntil}` : ' for a short while'}. Pay to confirm the
+            order.
+          </p>
+          <button
+            onClick={payNow}
+            disabled={paying}
+            className="mt-3 w-full rounded-lg bg-brand py-3 font-semibold text-white hover:bg-brand-light disabled:opacity-60"
+          >
+            {paying ? 'Opening payment…' : `Pay ${formatNaira(order.total)} now`}
+          </button>
+        </div>
+      )}
+
+      {/* Tracking */}
+      <section className="mt-8">
+        <h2 className="mb-4 font-semibold">Tracking</h2>
+        <OrderTimeline events={events} status={order.status} />
+      </section>
+
+      {/* Details */}
+      <div className="mt-2 space-y-4 rounded-xl bg-gray-50 p-5">
         <ul className="space-y-2 text-sm">
           {order.order_items.map((i) => (
             <li key={i.id} className="flex justify-between gap-3">
@@ -76,19 +196,50 @@ export default function OrderConfirmation() {
           ))}
         </ul>
 
-        <div className="flex justify-between border-t border-gray-200 pt-3 font-semibold">
-          <span>Total</span>
-          <span>{formatNaira(order.total)}</span>
-        </div>
+        <dl className="space-y-1 border-t border-gray-200 pt-3 text-sm">
+          <div className="flex justify-between">
+            <dt className="text-gray-500">Subtotal</dt>
+            <dd>{formatNaira(order.subtotal)}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-gray-500">Delivery{order.delivery_zone ? ` (${order.delivery_zone})` : ''}</dt>
+            <dd>{formatNaira(order.delivery_fee)}</dd>
+          </div>
+          {order.discount > 0 && (
+            <div className="flex justify-between text-green-700">
+              <dt>Voucher</dt>
+              <dd>-{formatNaira(order.discount)}</dd>
+            </div>
+          )}
+          <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-semibold">
+            <dt>Total</dt>
+            <dd>{formatNaira(order.total)}</dd>
+          </div>
+        </dl>
 
         <dl className="space-y-1 border-t border-gray-200 pt-3 text-sm">
           <div className="flex justify-between gap-4">
             <dt className="text-gray-500">Payment</dt>
-            <dd>{order.payment_method === 'on_delivery' ? 'Pay on delivery' : 'Online'}</dd>
+            <dd>
+              {order.payment_method === 'on_delivery'
+                ? 'Pay on delivery'
+                : order.payment_status === 'paid'
+                  ? 'Paid online'
+                  : order.payment_status === 'refunded'
+                    ? 'Refunded'
+                    : 'Online (not paid yet)'}
+            </dd>
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-gray-500">Deliver to</dt>
-            <dd className="text-right">{order.delivery_address}</dd>
+            <dd className="text-right">
+              {[order.delivery_zone, order.delivery_address].filter(Boolean).join(': ')}
+              {order.delivery_note && <span className="block text-xs text-gray-500">{order.delivery_note}</span>}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt className="text-gray-500">Phone</dt>
+            <dd>{order.phone}</dd>
           </div>
         </dl>
       </div>

@@ -1,6 +1,6 @@
 {
-  "name": "ThriftHub Admin",
-  "short_name": "Admin",
+  "name": "LOOMA Admin",
+  "short_name": "LOOMA",
   "description": "Manage orders and products",
   "start_url": "/admin",
   "scope": "/",

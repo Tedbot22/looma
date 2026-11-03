@@ -34,7 +34,9 @@ const GUEST_KEY = 'thrift-cart'
 function loadGuestCart(): CartItem[] {
   try {
     const raw = localStorage.getItem(GUEST_KEY)
-    return raw ? (JSON.parse(raw) as CartItem[]) : []
+    // Older saved carts may contain entries from the removed bundle feature: keep only normal items.
+    const items = raw ? (JSON.parse(raw) as (CartItem & { kind?: string })[]) : []
+    return items.filter((i) => i.kind !== 'bundle')
   } catch {
     return []
   }
@@ -141,10 +143,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // If the write fails, re-fetch so the screen shows the truth again.
     const setServerItems = (update: (prev: CartItem[]) => CartItem[]) =>
       queryClient.setQueryData<CartItem[]>(['cart', userId], (prev) => update(prev ?? []))
-    const syncFailed = () => queryClient.invalidateQueries({ queryKey: ['cart', userId] })
     const run = (op: PromiseLike<{ error: unknown }>) => {
       op.then(({ error }) => {
-        if (error) syncFailed()
+        if (error) queryClient.invalidateQueries({ queryKey: ['cart', userId] })
       })
     }
 

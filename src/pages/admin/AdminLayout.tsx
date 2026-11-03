@@ -25,6 +25,12 @@ export default function AdminLayout() {
           <NavLink to="/admin/products" className={tabClass}>
             Products
           </NavLink>
+          <NavLink to="/admin/delivery" className={tabClass}>
+            Delivery
+          </NavLink>
+          <NavLink to="/admin/vouchers" className={tabClass}>
+            Vouchers
+          </NavLink>
         </nav>
       </header>
 

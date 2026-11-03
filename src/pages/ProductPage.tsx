@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Heart, MessageCircle, Minus, Plus } from 'lucide-react'
@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { discountPercent } from '../lib/format'
 import { whatsappLink } from '../lib/whatsapp'
+import { addRecentId } from '../lib/recentlyViewed'
 import { useCart } from '../context/CartContext'
 import { useWishlist } from '../context/WishlistContext'
 import PriceTag from '../components/PriceTag'
@@ -43,6 +44,12 @@ export default function ProductPage() {
     },
     enabled: !!productId,
   })
+
+  // Remember this product for the "Recently viewed" page.
+  const viewedId = product?.id
+  useEffect(() => {
+    if (viewedId) addRecentId(viewedId)
+  }, [viewedId])
 
   if (isLoading) return <p className="py-20 text-center text-gray-400">Loading…</p>
   if (error) return <p className="py-20 text-center text-red-600">Couldn't load this item.</p>

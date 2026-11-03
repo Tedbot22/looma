@@ -116,7 +116,7 @@ async function notifyOrder(orderId: string): Promise<Response> {
   const { data, error } = await supabase
     .from('orders')
     .select(
-      'id, order_number, total, payment_method, delivery_address, phone, profiles(full_name), order_items(name, quantity, unit_price, bundle_id, product_variants(product_id))'
+      'id, order_number, total, delivery_fee, delivery_zone, delivery_note, delivery_lat, delivery_lon, delivery_distance_m, origin_lat, origin_lon, payment_method, delivery_address, phone, profiles(full_name), order_items(name, quantity, unit_price, product_variants(product_id))'
     )
     .eq('id', orderId)
     .single()
@@ -130,9 +130,9 @@ async function notifyOrder(orderId: string): Promise<Response> {
   const order = data as any
   const customer: string = order.profiles?.full_name || 'A customer'
   const items = (order.order_items ?? []).map(
-    (i: { name: string; quantity: number; unit_price: number; bundle_id: string | null; product_variants: { product_id: string } | null }) => ({
+    (i: { name: string; quantity: number; unit_price: number; product_variants: { product_id: string } | null }) => ({
       text: `${i.name} ×${i.quantity}`,
-      productId: i.product_variants?.product_id ?? i.bundle_id ?? '',
+      productId: i.product_variants?.product_id ?? '',
       price: i.unit_price * i.quantity,
     })
   )
@@ -143,7 +143,7 @@ async function notifyOrder(orderId: string): Promise<Response> {
   const shortId = String(order.id).slice(0, 8)
   const payload = {
     title: `New order #${order.order_number} · ${naira(order.total)}`,
-    body: `${customer}: ${firstTwo}${more}\nOrder ID: ${shortId}`,
+    body: `${customer}${order.delivery_zone ? ` · ${order.delivery_zone}` : ''}: ${firstTwo}${more}\nOrder ID: ${shortId}`,
     tag: `order-${order.id}`,
     url: '/admin',
   }
@@ -160,6 +160,14 @@ async function notifyOrder(orderId: string): Promise<Response> {
     )
     .join('')
 
+  // A Google Maps link from the store to the customer, when the order has an exact location.
+  const routeLink =
+    order.delivery_lat != null && order.origin_lat != null
+      ? `https://www.google.com/maps/dir/?api=1&origin=${order.origin_lat},${order.origin_lon}` +
+        `&destination=${order.delivery_lat},${order.delivery_lon}&travelmode=driving`
+      : null
+  const distance = order.delivery_distance_m != null ? `${(order.delivery_distance_m / 1000).toFixed(1)} km` : null
+
   const html = `
     <h2>New order #${order.order_number}</h2>
     <p><b>Order ID:</b> ${esc(order.id)}<br>
@@ -167,7 +175,12 @@ async function notifyOrder(orderId: string): Promise<Response> {
     <table>${rows}</table>
     <p><b>Customer:</b> ${esc(customer)}<br>
        <b>Phone:</b> ${esc(order.phone)}<br>
-       <b>Deliver to:</b> ${esc(order.delivery_address)}</p>
+       <b>Deliver to:</b> ${esc([order.delivery_zone, order.delivery_address].filter(Boolean).join(': '))}<br>
+       ${order.delivery_note ? `<b>Note:</b> ${esc(order.delivery_note)}<br>` : ''}
+       ${order.delivery_lat != null ? `<b>Location:</b> ${order.delivery_lat}, ${order.delivery_lon}<br>` : ''}
+       ${distance ? `<b>Distance:</b> ${distance}<br>` : ''}
+       <b>Delivery fee included:</b> ${naira(order.delivery_fee ?? 0)}</p>
+    ${routeLink ? `<p><a href="${esc(routeLink)}">View route on Google Maps</a></p>` : ''}
     <p><a href="${esc(Deno.env.get('SITE_URL') ?? '')}/admin">Open the admin</a></p>`
 
   const emailed = await sendEmail(`New order #${order.order_number} · ${naira(order.total)}`, html)

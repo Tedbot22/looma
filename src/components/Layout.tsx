@@ -1,9 +1,8 @@
 import { useEffect } from 'react'
 import { Link, NavLink, Outlet, useSearchParams } from 'react-router-dom'
-import { Heart, ShoppingBag } from 'lucide-react'
+import { ShoppingBag, User } from 'lucide-react'
 import { REFERRAL_KEY, STORE_NAME } from '../config'
 import { useCart } from '../context/CartContext'
-import { useWishlist } from '../context/WishlistContext'
 import { useProfile } from '../hooks/useProfile'
 import { useRealtimeStock } from '../hooks/useRealtimeStock'
 import { useAuth } from '../context/AuthContext'
@@ -15,10 +14,9 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 export default function Layout() {
   const { count } = useCart()
-  const { items: wishItems } = useWishlist()
   const { data: profile } = useProfile()
   useRealtimeStock() // items flip to "Sold out" live, without a refresh
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
   const [params] = useSearchParams()
 
   // Invite links look like https://yourstore.com/?ref=AB12CD34.
@@ -49,14 +47,6 @@ export default function Layout() {
             <NavLink to="/shop" className={navLinkClass}>
               Shop
             </NavLink>
-            <Link to="/wishlist" aria-label="Wishlist" className="relative text-brand">
-              <Heart size={22} />
-              {wishItems.length > 0 && (
-                <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-gray-700 px-1 text-[10px] font-bold text-white">
-                  {wishItems.length}
-                </span>
-              )}
-            </Link>
             <Link to="/cart" aria-label="Cart" className="relative text-brand">
               <ShoppingBag size={22} />
               {count > 0 && (
@@ -71,9 +61,9 @@ export default function Layout() {
               </NavLink>
             )}
             {user ? (
-              <button onClick={signOut} className="text-sm font-medium text-gray-500 hover:text-brand">
-                Log out
-              </button>
+              <Link to="/account" aria-label="Your account" className="text-brand">
+                <User size={22} />
+              </Link>
             ) : (
               <NavLink to="/login" className={navLinkClass}>
                 Log in

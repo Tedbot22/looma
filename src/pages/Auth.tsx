@@ -79,6 +79,19 @@ export default function Auth({ mode }: { mode: 'login' | 'signup' }) {
       setSubmitting(false)
     }
   }
+/*
+const basePrice = 500 
+cosnt ppkm = 150
+const km = getKM () =>{ get km from googleMap}
+const kmp = ppkm * km
+if base(){
+  get base price () {
+    get ppkm () {
+      base + kmp
+    }
+  }
+}
+*/
 
   // Keep the ?next= part when switching between login and signup.
   const switchLink = `${isSignup ? '/login' : '/signup'}${

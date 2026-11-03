@@ -22,5 +22,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "../vite.config.ts"]
+  "include": ["src", "../vite.config.ts", "../useDeliveryZones.ts", "../Claude/files/App.tsx", "../Claude/files/OrderConfirmation.tsx", "src/pages/Checkout.tsx"]
 }
