@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { ListSkeleton } from '../../components/Skeleton'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Eye, EyeOff, ImageOff, Pencil, Plus } from 'lucide-react'
 import { toast } from 'sonner'
@@ -53,7 +54,7 @@ export default function AdminProducts() {
         </Link>
       </div>
 
-      {isLoading && <p className="text-gray-400">Loading products…</p>}
+      {isLoading && <ListSkeleton rows={4} withImage />}
       {error && <p className="text-red-600">Couldn't load products: {(error as Error).message}</p>}
       {products && products.length === 0 && (
         <p className="py-16 text-center text-gray-400">No products yet. Add your first one!</p>

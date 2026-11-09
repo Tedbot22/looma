@@ -22,7 +22,7 @@ export async function searchAddresses(
   const params = new URLSearchParams({
     text,
     filter: 'countrycode:ng', // Nigeria only
-    limit: '5',
+    limit: '10',
     lang: 'en',
     apiKey: GEOAPIFY_KEY ?? '',
   })

@@ -22,8 +22,9 @@ export async function resizeImage(file: File, maxSize = 1200, quality = 0.82): P
 }
 
 // Uploads one photo and returns its public URL.
-export async function uploadProductImage(file: File): Promise<string> {
-  const blob = await resizeImage(file)
+// maxSize is the longest side in pixels: product photos use 1200, wide banners use more.
+export async function uploadProductImage(file: File, maxSize = 1200): Promise<string> {
+  const blob = await resizeImage(file, maxSize)
   const path = `${crypto.randomUUID()}.jpg` // random name: no clashes, no guessable URLs
 
   const { error } = await supabase.storage

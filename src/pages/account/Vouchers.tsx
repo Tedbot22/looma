@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ListSkeleton } from '../../components/Skeleton'
 import { Link } from 'react-router-dom'
 import { Ticket } from 'lucide-react'
 import { formatNaira } from '../../lib/format'
@@ -78,7 +79,7 @@ export default function Vouchers() {
         ))}
       </div>
 
-      {isLoading && <p className="text-gray-400">Loading…</p>}
+      {isLoading && <ListSkeleton rows={3} />}
 
       {!isLoading && shown.length === 0 && (
         <div className="rounded-2xl border border-dashed border-gray-300 px-6 py-14 text-center">

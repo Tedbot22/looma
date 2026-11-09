@@ -12,6 +12,7 @@ export interface Product {
   category_id: string
   name: string
   description: string | null
+  details: string | null // extra product details, one per line
   price: number
   compare_at_price: number | null
   images: string[]
@@ -33,6 +34,7 @@ export interface ProductVariant {
 //   supabase.from('products').select('*, product_variants(*)')
 export interface ProductWithVariants extends Product {
   product_variants: ProductVariant[]
+  categories?: { name: string } | null // present when the product page asks for it
 }
 
 export interface OrderItem {
@@ -50,7 +52,7 @@ export interface Order {
   user_id: string
   total: number
   payment_method: 'online' | 'on_delivery'
-  payment_status: 'pending' | 'paid' | 'failed' | 'refunded'
+  payment_status: 'pending' | 'paid' | 'failed' | 'refund_pending' | 'refunded' | 'refund_failed'
   status: 'pending_payment' | 'placed' | 'confirmed' | 'out_for_delivery' | 'delivered' | 'cancelled'
   subtotal: number
   delivery_fee: number

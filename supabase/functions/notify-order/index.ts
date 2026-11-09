@@ -193,6 +193,47 @@ async function notifyOrder(orderId: string): Promise<Response> {
   return json({ pushed, emailed })
 }
 
+// Tells the owner an order was cancelled, so nobody prepares or delivers it.
+// Not "claimed" like new orders: every cancellation is announced once, by cancel-order.
+async function notifyCancelled(orderId: string, refund: string, byCustomer: boolean): Promise<Response> {
+  const { data } = await supabase
+    .from('orders')
+    .select('id, order_number, total, payment_method, payment_status, phone, profiles(full_name)')
+    .eq('id', orderId)
+    .single()
+  if (!data) return json({ error: 'order not found' }, 404)
+
+  // deno-lint-ignore no-explicit-any
+  const order = data as any
+  const customer: string = order.profiles?.full_name || 'A customer'
+  const who = byCustomer ? `${customer} cancelled` : 'You cancelled'
+  const refundLine =
+    order.payment_method !== 'online' || refund === 'none'
+      ? 'Nothing to refund (not paid online).'
+      : refund === 'failed'
+        ? 'REFUND FAILED. Open Payments in the admin to retry.'
+        : 'Refund started automatically.'
+
+  const payload = {
+    title: `Order #${order.order_number} cancelled`,
+    body: `${who} ${naira(order.total)}. ${refundLine}`,
+    tag: `cancel-${order.id}`,
+    url: '/admin',
+  }
+  const { data: devices } = await supabase.from('device_tokens').select('id, token')
+  const { sent: pushed } = await pushToDevices(devices ?? [], payload)
+
+  const emailed = await sendEmail(
+    `Order #${order.order_number} cancelled`,
+    `<h2>Order #${order.order_number} cancelled</h2>
+     <p>${esc(who)} this order (${naira(order.total)}, ${order.payment_method === 'on_delivery' ? 'pay on delivery' : 'online'}).</p>
+     <p><b>${esc(refundLine)}</b></p>
+     <p><b>Customer:</b> ${esc(customer)}<br><b>Phone:</b> ${esc(order.phone)}</p>
+     <p><a href="${esc(Deno.env.get('SITE_URL') ?? '')}/admin">Open the admin</a></p>`
+  )
+  return json({ pushed, emailed })
+}
+
 async function sendTest(authHeader: string | null): Promise<Response> {
   if (!authHeader?.startsWith('Bearer ')) {
     return json({ error: 'unauthorized', reason: 'No login token was sent. Log out and log in again.' }, 401)
@@ -254,6 +295,9 @@ Deno.serve(async (req) => {
   // Path 1: the database trigger, proven by a shared secret.
   const secret = req.headers.get('x-webhook-secret')
   if (secret && secret === Deno.env.get('WEBHOOK_SECRET') && body.order_id) {
+    if (body.kind === 'cancelled') {
+      return await notifyCancelled(String(body.order_id), String(body.refund ?? 'none'), body.by_customer === true)
+    }
     return await notifyOrder(String(body.order_id))
   }
 

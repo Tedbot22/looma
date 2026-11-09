@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { CheckoutSkeleton } from '../components/Skeleton'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Home } from 'lucide-react'
@@ -38,6 +39,9 @@ export default function Checkout() {
   const [method, setMethod] = useState<'on_delivery' | 'online'>('on_delivery')
   // null = "the customer hasn't chosen", so we apply their best voucher. 'none' = they chose no voucher.
   const [couponChoice, setCouponChoice] = useState<string | null>(null)
+  // The voucher code box: what is typed, and the message shown under it.
+  const [codeInput, setCodeInput] = useState('')
+  const [codeMessage, setCodeMessage] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   const phone = phoneInput ?? profile?.phone ?? ''
@@ -103,7 +107,7 @@ export default function Checkout() {
   const grandTotal = Math.max(0, total + fee - discount) // the server recomputes this itself; this is for display
 
   if (loading || addressesLoading || zonesLoading) {
-    return <p className="py-20 text-center text-gray-400">Loading…</p>
+    return <CheckoutSkeleton />
   }
 
   if (orderable.length === 0) {
@@ -117,6 +121,36 @@ export default function Checkout() {
         </Link>
       </div>
     )
+  }
+
+  // Apply a voucher by its code. We only look among the customer's OWN vouchers (already loaded),
+  // so a code can never be used to discover or claim someone else's voucher.
+  function applyCode() {
+    const code = codeInput.trim().toUpperCase()
+    if (!code) {
+      setCodeMessage({ type: 'error', text: 'Enter a voucher code.' })
+      return
+    }
+
+    const match = coupons.find((c) => c.code.toUpperCase() === code)
+    if (!match) {
+      setCodeMessage({ type: 'error', text: "That code isn't one of your vouchers. Check it and try again." })
+      return
+    }
+
+    const status = couponStatus(match)
+    if (status === 'used') {
+      setCodeMessage({ type: 'error', text: 'That voucher has already been used.' })
+    } else if (status === 'expired') {
+      const when = new Date(match.expires_at).toLocaleDateString('en-NG', { dateStyle: 'medium' })
+      setCodeMessage({ type: 'error', text: `That voucher expired on ${when}.` })
+    } else if (total < match.min_order) {
+      setCodeMessage({ type: 'error', text: `Spend ${formatNaira(match.min_order - total)} more to use this voucher.` })
+    } else {
+      setCouponChoice(match.id)
+      setCodeInput('')
+      setCodeMessage({ type: 'ok', text: `Applied: ${describeCoupon(match)}` })
+    }
   }
 
   // Called by the dialog: save the address to the profile, then select it in the menu.
@@ -338,10 +372,42 @@ export default function Checkout() {
           <p className="text-xs text-gray-400">We'll call or message this number about your delivery.</p>
         </section>
 
-        {voucherOptions.length > 0 && (
-          <section className="space-y-2">
-            <h2 className="font-semibold">Voucher</h2>
+        <section className="space-y-2">
+          <h2 className="font-semibold">Voucher</h2>
 
+          <div className="flex gap-2">
+            <input
+              className={`${inputClass} uppercase placeholder:normal-case`}
+              placeholder="Enter voucher code"
+              value={codeInput}
+              autoCapitalize="characters"
+              autoComplete="off"
+              onChange={(e) => {
+                setCodeInput(e.target.value)
+                setCodeMessage(null)
+              }}
+              // Pressing Enter here applies the code. Without this it would place the order.
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  applyCode()
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={applyCode}
+              className="shrink-0 rounded-lg border border-brand px-5 text-sm font-semibold text-brand hover:bg-gray-50"
+            >
+              Apply
+            </button>
+          </div>
+          {codeMessage && (
+            <p className={`text-sm ${codeMessage.type === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{codeMessage.text}</p>
+          )}
+
+          {voucherOptions.length > 0 && (
+            <>
             {voucherOptions.map(({ coupon, eligible, discount: saves }) => (
               <label
                 key={coupon.id}
@@ -374,8 +440,9 @@ export default function Checkout() {
               <input type="radio" name="voucher" checked={!chosenVoucher} onChange={() => setCouponChoice('none')} />
               <span className="text-sm font-medium">Don't use a voucher</span>
             </label>
-          </section>
-        )}
+            </>
+          )}
+        </section>
 
         <section className="space-y-2">
           <h2 className="font-semibold">Payment</h2>

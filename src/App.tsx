@@ -1,30 +1,36 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import Layout from '../../looma/src/components/Layout'
-import Home from '../../looma/src/pages/Home'
-import Shop from '../../looma/src/pages/Shop'
-import ProductPage from '../../looma/src/pages/ProductPage'
-import Cart from '../../looma/src/pages/Cart'
-import Wishlist from '../../looma/src/pages/Wishlist'
-import AccountLayout from '../../looma/src/pages/account/AccountLayout'
-import AccountHome from '../../looma/src/pages/account/AccountHome'
-import AccountOrders from '../../looma/src/pages/account/AccountOrders'
-import Vouchers from '../../looma/src/pages/account/Vouchers'
-import RecentlyViewed from '../../looma/src/pages/account/RecentlyViewed'
-import EditProfile from '../../looma/src/pages/account/EditProfile'
-import Invite from '../../looma/src/pages/account/Invite'
-import Auth from '../../looma/src/pages/Auth'
+import Layout from './components/Layout'
+import Home from './pages/Home'
+import Shop from './pages/Shop'
+import ProductPage from './pages/ProductPage'
+import Cart from './pages/Cart'
+import Wishlist from './pages/Wishlist'
+import AccountLayout from './pages/account/AccountLayout'
+import AccountHome from './pages/account/AccountHome'
+import AccountOrders from './pages/account/AccountOrders'
+import Vouchers from './pages/account/Vouchers'
+import RecentlyViewed from './pages/account/RecentlyViewed'
+import EditProfile from './pages/account/EditProfile'
+import Invite from './pages/account/Invite'
+import Auth from './pages/Auth'
 import Checkout from './pages/Checkout'
 import OrderConfirmation from './pages/OrderConfirmation'
-import RequireAuth from '../../looma/src/components/RequireAuth'
-import RequireAdmin from '../../looma/src/components/RequireAdmin'
-import AdminLayout from '../../looma/src/pages/admin/AdminLayout'
-import AdminOrders from '../../looma/src/pages/admin/AdminOrders'
-import AdminProducts from '../../looma/src/pages/admin/AdminProducts'
-import AdminProductEdit from '../../looma/src/pages/admin/AdminProductEdit'
-import ProductForm from '../../looma/src/pages/admin/ProductForm'
-import AdminCoupons from '../../looma/src/pages/admin/AdminCoupons'
-import AdminDelivery from '../../looma/src/pages/admin/AdminDelivery'
-import ComingSoon from '../../looma/src/pages/ComingSoon'
+import ContentPage from './pages/ContentPage'
+import Contact from './pages/Contact'
+import Recommended from './pages/Recommended'
+import RequireAuth from './components/RequireAuth'
+import RequireAdmin from './components/RequireAdmin'
+import AdminLayout from './pages/admin/AdminLayout'
+import AdminOrders from './pages/admin/AdminOrders'
+import AdminProducts from './pages/admin/AdminProducts'
+import AdminProductEdit from './pages/admin/AdminProductEdit'
+import ProductForm from './pages/admin/ProductForm'
+import AdminCoupons from './pages/admin/AdminCoupons'
+import AdminDelivery from './pages/admin/AdminDelivery'
+import AdminBanners from './pages/admin/AdminBanners'
+import AdminStore from './pages/admin/AdminStore'
+import ComingSoon from './pages/ComingSoon'
+import RiderDelivery from './pages/RiderDelivery'
 
 export default function App() {
   return (
@@ -44,8 +50,13 @@ export default function App() {
           <Route path="products/new" element={<ProductForm />} />
           <Route path="products/:productId" element={<AdminProductEdit />} />
           <Route path="delivery" element={<AdminDelivery />} />
+          <Route path="banners" element={<AdminBanners />} />
+          <Route path="store" element={<AdminStore />} />
           <Route path="vouchers" element={<AdminCoupons />} />
         </Route>
+
+        {/* Rider delivery page: no login, no store header/footer. The secret link is the credential. */}
+        <Route path="/rider/:token" element={<RiderDelivery />} />
 
         {/* Everything inside Layout gets the shared header and footer */}
         <Route element={<Layout />}>
@@ -54,6 +65,17 @@ export default function App() {
           <Route path="/shop/:categoryId" element={<Shop />} />
           <Route path="/product/:productId" element={<ProductPage />} />
           <Route path="/cart" element={<Cart />} />
+          {/* Help and company pages (the owner edits their text in Admin, then Store) */}
+          <Route path="/about" element={<ContentPage slug="about" />} />
+          <Route path="/faq" element={<ContentPage slug="faq" accordion />} />
+          <Route path="/privacy" element={<ContentPage slug="privacy" />} />
+          <Route path="/terms" element={<ContentPage slug="terms" />} />
+          <Route path="/contact" element={<Contact />} />
+
+          {/* The full lists behind the home page's "View all" buttons (open to everyone) */}
+          <Route path="/recommended" element={<Recommended />} />
+          <Route path="/recently-viewed" element={<RecentlyViewed />} />
+
           {/* The wishlist now lives inside the account area; old links still work */}
           <Route path="/wishlist" element={<Navigate to="/account/wishlist" replace />} />
           <Route

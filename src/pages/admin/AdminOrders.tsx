@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ListSkeleton } from '../../components/Skeleton'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { MapPin, MessageCircle, Phone, Route } from 'lucide-react'
 import { toast } from 'sonner'
@@ -7,9 +8,12 @@ import { formatNaira } from '../../lib/format'
 import { whatsappLinkTo } from '../../lib/whatsapp'
 import { formatKm, routeUrl } from '../../lib/delivery'
 import type { OrderWithItems } from '../../lib/types'
+import AdminDeliveryPanel from '../../components/AdminDeliveryPanel'
+import { ACTIVE_STATUSES, type DeliveryAssignment } from '../../lib/adminDelivery'
 
 type AdminOrder = OrderWithItems & {
   profiles: { full_name: string | null; phone: string | null } | null
+  delivery_assignments: DeliveryAssignment[]
 }
 
 const TABS = [
@@ -60,7 +64,10 @@ export default function AdminOrders() {
     queryFn: async (): Promise<AdminOrder[]> => {
       let query = supabase
         .from('orders')
-        .select('*, order_items(*), profiles(full_name, phone)')
+        .select(
+          '*, order_items(*), profiles(full_name, phone), ' +
+            'delivery_assignments(id, order_id, rider_name, rider_phone, dispatch_company, status, expires_at, qr_verified_at, completed_at, closed_reason, created_at)'
+        )
         .order('created_at', { ascending: false })
         .limit(100)
 
@@ -104,6 +111,19 @@ export default function AdminOrders() {
     updateStatus.mutate({ id: order.id, status: 'out_for_delivery', note })
   }
 
+  // With a rider assigned, "delivered" should come from the QR check. Doing it by hand skips that, so warn first.
+  function markDelivered(order: AdminOrder, hasRider: boolean) {
+    if (
+      hasRider &&
+      !window.confirm(
+        'A rider is assigned to this order. Marking it delivered by hand SKIPS the customer QR check, ' +
+          "ends the rider's link, and is recorded as a manual override. Continue?"
+      )
+    )
+      return
+    updateStatus.mutate({ id: order.id, status: 'delivered' })
+  }
+
   function cancel(order: AdminOrder) {
     if (!window.confirm(`Cancel order #${order.order_number}? Its items will go back into stock.`)) return
     updateStatus.mutate({ id: order.id, status: 'cancelled' })
@@ -127,7 +147,7 @@ export default function AdminOrders() {
         ))}
       </div>
 
-      {isLoading && <p className="text-gray-400">Loading orders…</p>}
+      {isLoading && <ListSkeleton rows={3} />}
       {error && <p className="text-red-600">Couldn't load orders: {(error as Error).message}</p>}
       {orders && orders.length === 0 && (
         <p className="py-16 text-center text-gray-400">No orders here yet.</p>
@@ -137,6 +157,7 @@ export default function AdminOrders() {
         {orders?.map((order) => {
           const customerName = order.profiles?.full_name || 'Customer'
           const closed = order.status === 'delivered' || order.status === 'cancelled'
+          const hasRider = (order.delivery_assignments ?? []).some((a) => ACTIVE_STATUSES.includes(a.status))
           const message = `Hi ${customerName}, this is about your order #${order.order_number}.`
 
           return (
@@ -212,6 +233,14 @@ export default function AdminOrders() {
                 )}
               </div>
 
+              <AdminDeliveryPanel
+                orderId={order.id}
+                orderNumber={order.order_number}
+                orderStatus={order.status}
+                assignments={order.delivery_assignments ?? []}
+                onChanged={() => queryClient.invalidateQueries({ queryKey: ['admin-orders'] })}
+              />
+
               <div className="mt-4 flex flex-wrap gap-2">
                 <a
                   href={whatsappLinkTo(order.phone, message)}
@@ -248,7 +277,7 @@ export default function AdminOrders() {
                     Confirm
                   </button>
                 )}
-                {(order.status === 'placed' || order.status === 'confirmed') && (
+                {(order.status === 'placed' || order.status === 'confirmed') && !hasRider && (
                   <button
                     disabled={updateStatus.isPending}
                     onClick={() => sendOut(order)}
@@ -260,7 +289,7 @@ export default function AdminOrders() {
                 {(order.status === 'placed' || order.status === 'confirmed' || order.status === 'out_for_delivery') && (
                   <button
                     disabled={updateStatus.isPending}
-                    onClick={() => updateStatus.mutate({ id: order.id, status: 'delivered' })}
+                    onClick={() => markDelivered(order, hasRider)}
                     className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60"
                   >
                     Mark delivered

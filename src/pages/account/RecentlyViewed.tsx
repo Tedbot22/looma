@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ProductGridSkeleton } from '../../components/Skeleton'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
@@ -52,7 +53,7 @@ export default function RecentlyViewed() {
         </div>
       )}
 
-      {isLoading && <p className="text-gray-400">Loading…</p>}
+      {isLoading && <ProductGridSkeleton count={4} />}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {products?.map((p) => (

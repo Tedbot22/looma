@@ -11,6 +11,10 @@ import { useCart } from '../context/CartContext'
 import { useWishlist } from '../context/WishlistContext'
 import PriceTag from '../components/PriceTag'
 import ImageCarousel from '../components/ImageCarousel'
+import ProductDetails from '../components/ProductDetails'
+import YouMayAlsoLike from '../components/YouMayAlsoLike'
+import StoreReviewsLink from '../components/StoreReviewsLink'
+import { ProductPageSkeleton } from '../components/Skeleton'
 import type { ProductVariant, ProductWithVariants } from '../lib/types'
 
 function variantLabel(v: ProductVariant): string {
@@ -35,7 +39,7 @@ export default function ProductPage() {
     queryFn: async (): Promise<ProductWithVariants | null> => {
       const { data, error } = await supabase
         .from('products')
-        .select('*, product_variants(*)')
+        .select('*, categories(name), product_variants(*)')
         .eq('id', productId!)
         .eq('is_active', true)
         .maybeSingle()
@@ -51,7 +55,14 @@ export default function ProductPage() {
     if (viewedId) addRecentId(viewedId)
   }, [viewedId])
 
-  if (isLoading) return <p className="py-20 text-center text-gray-400">Loading…</p>
+  // Opening another product from the "You may also like" row: start at the top with a fresh selection.
+  useEffect(() => {
+    window.scrollTo({ top: 0 })
+    setSelectedId(null)
+    setQuantity(1)
+  }, [productId])
+
+  if (isLoading) return <ProductPageSkeleton />
   if (error) return <p className="py-20 text-center text-red-600">Couldn't load this item.</p>
   if (!product) {
     return (
@@ -118,7 +129,7 @@ export default function ProductPage() {
     `\nProduct ID: ${product.id}\n${window.location.href}`
 
   return (
-    <div>
+    <div className="mx-auto max-w-6xl">
       <Link to="/shop" className="mb-4 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-brand">
         <ArrowLeft size={16} /> Back to shop
       </Link>
@@ -244,6 +255,12 @@ export default function ProductPage() {
           </div>
         </div>
       </div>
+
+      <ProductDetails product={product} />
+
+      <StoreReviewsLink />
+
+      <YouMayAlsoLike product={product} />
     </div>
   )
 }

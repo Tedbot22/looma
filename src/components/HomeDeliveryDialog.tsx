@@ -98,7 +98,7 @@ export default function HomeDeliveryDialog({ zone, onSave, onCancel }: Props) {
       >
         <h2 className="text-lg font-semibold">Home delivery</h2>
         <p className="mb-4 mt-1 text-sm text-gray-500">
-          Enter where we should deliver. It's saved to your profile, so next time it's one tap.
+          Enter address where we should deliver
         </p>
 
         <LocationFields

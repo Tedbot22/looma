@@ -2,10 +2,14 @@ import { useEffect } from 'react'
 import { Link, NavLink, Outlet, useSearchParams } from 'react-router-dom'
 import { ShoppingBag, User } from 'lucide-react'
 import { REFERRAL_KEY, STORE_NAME } from '../config'
+import { PAGE_WIDTH } from '../lib/layout'
 import { useCart } from '../context/CartContext'
 import { useProfile } from '../hooks/useProfile'
 import { useRealtimeStock } from '../hooks/useRealtimeStock'
 import { useAuth } from '../context/AuthContext'
+import HeaderSearch from './HeaderSearch'
+import Footer from './Footer'
+import ReviewPromptBanner from '../components/ReviewPromptBanner'
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `text-sm font-medium transition-colors ${
@@ -34,14 +38,17 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 border-b border-gray-100 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-          <Link to="/" className="text-xl font-bold tracking-tight text-brand">
+      <header className="sticky top-0 z-30 border-b border-gray-100 bg-white/95 backdrop-blur">
+        {/* On a phone the search drops to its own full-width row; on a larger screen it sits in the middle. */}
+        <div className={`${PAGE_WIDTH} flex flex-wrap items-center gap-x-4 gap-y-3 py-3 md:flex-nowrap md:gap-x-8`}>
+          <Link to="/" className="order-1 text-xl font-bold tracking-tight text-brand">
             {STORE_NAME}
           </Link>
 
-          <nav className="flex items-center gap-6">
-            <NavLink to="/" end className={navLinkClass}>
+          <HeaderSearch className="order-3 w-full md:order-2 md:max-w-xl md:flex-1" />
+
+          <nav className="order-2 ml-auto flex items-center gap-5 md:order-3 md:ml-0 md:gap-6">
+            <NavLink to="/" end className={`${navLinkClass} hidden md:block`}>
               Home
             </NavLink>
             <NavLink to="/shop" className={navLinkClass}>
@@ -74,13 +81,12 @@ export default function Layout() {
       </header>
 
       {/* <Outlet /> is where the current page renders */}
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+      <main className={`${PAGE_WIDTH} flex-1 py-6`}>
         <Outlet />
       </main>
 
-      <footer className="border-t border-gray-100 py-6 text-center text-sm text-gray-400">
-        © {new Date().getFullYear()} {STORE_NAME}. Affordable style for students.
-      </footer>
+      <ReviewPromptBanner />
+      <Footer />
     </div>
   )
 }

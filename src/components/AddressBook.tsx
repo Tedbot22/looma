@@ -34,7 +34,7 @@ export default function AddressBook() {
     <section className="mt-10">
       <h2 className="mb-1 text-lg font-semibold">Home delivery addresses</h2>
       <p className="mb-4 text-sm text-gray-500">
-        Save your address once and pick it in one tap at checkout. The delivery fee is worked out from the distance.
+        Save your address once and pick it in one tap at checkout.
       </p>
 
       {isLoading && <p className="text-sm text-gray-400">Loading…</p>}

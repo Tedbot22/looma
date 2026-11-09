@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { OrderSkeleton } from '../components/Skeleton'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { CheckCircle2, Clock, MessageCircle } from 'lucide-react'
@@ -8,6 +9,7 @@ import { formatNaira } from '../lib/format'
 import { whatsappLink } from '../lib/whatsapp'
 import { startPayment, verifyPayment } from '../lib/payments'
 import OrderTimeline from '../components/OrderTimeline'
+import DeliveryQr from '../components/DeliveryQr'
 import type { OrderEvent, OrderWithItems } from '../lib/types'
 
 const STATUS_LABEL: Record<OrderWithItems['status'], string> = {
@@ -121,7 +123,7 @@ export default function OrderConfirmation() {
     }
   }
 
-  if (isLoading) return <p className="py-20 text-center text-gray-400">Loading your order…</p>
+  if (isLoading) return <OrderSkeleton />
   if (error || !order) {
     return (
       <div className="py-20 text-center">
@@ -175,6 +177,11 @@ export default function OrderConfirmation() {
             {paying ? 'Opening payment…' : `Pay ${formatNaira(order.total)} now`}
           </button>
         </div>
+      )}
+
+      {/* Delivery verification: appears only while a rider is assigned */}
+      {!awaitingPayment && order.status !== 'cancelled' && order.status !== 'delivered' && (
+        <DeliveryQr orderId={order.id} />
       )}
 
       {/* Tracking */}

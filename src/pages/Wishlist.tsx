@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { ProductGridSkeleton } from '../components/Skeleton'
 import { Heart, ImageOff, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart } from '../context/CartContext'
@@ -28,7 +29,7 @@ export default function Wishlist() {
     toast.success('Moved to cart')
   }
 
-  if (loading) return <p className="py-20 text-center text-gray-400">Loading your wishlist…</p>
+  if (loading) return <ProductGridSkeleton count={4} />
 
   if (items.length === 0) {
     return (

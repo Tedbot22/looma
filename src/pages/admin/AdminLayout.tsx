@@ -4,7 +4,7 @@ import { STORE_NAME } from '../../config'
 import PushToggle from './PushToggle'
 
 const tabClass = ({ isActive }: { isActive: boolean }) =>
-  `rounded-full px-4 py-1.5 text-sm font-medium ${
+  `shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium ${
     isActive ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'
   }`
 
@@ -18,7 +18,7 @@ export default function AdminLayout() {
             View store <ExternalLink size={14} />
           </Link>
         </div>
-        <nav className="mx-auto flex max-w-4xl gap-2 px-4 pb-3">
+        <nav className="mx-auto flex max-w-4xl gap-2 overflow-x-auto px-4 pb-3">
           <NavLink to="/admin" end className={tabClass}>
             Orders
           </NavLink>
@@ -28,8 +28,17 @@ export default function AdminLayout() {
           <NavLink to="/admin/delivery" className={tabClass}>
             Delivery
           </NavLink>
+          <NavLink to="/admin/banners" className={tabClass}>
+            Banners
+          </NavLink>
+          <NavLink to="/admin/store" className={tabClass}>
+            Store
+          </NavLink>
           <NavLink to="/admin/vouchers" className={tabClass}>
             Vouchers
+          </NavLink>
+          <NavLink to="/admin/reviews" className={tabClass}>
+            Reviews
           </NavLink>
         </nav>
       </header>

@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
+import { CartSkeleton } from '../components/Skeleton'
 import { Heart, ImageOff, Minus, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart } from '../context/CartContext'
@@ -34,7 +35,7 @@ export default function Cart() {
     navigate(user ? '/checkout' : '/login?next=/checkout')
   }
 
-  if (loading) return <p className="py-20 text-center text-gray-400">Loading your cart…</p>
+  if (loading) return <CartSkeleton />
 
   if (lines.length === 0) {
     return (

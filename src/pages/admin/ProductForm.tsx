@@ -35,6 +35,7 @@ export default function ProductForm({ initial }: Props) {
 
   const [name, setName] = useState(initial?.product.name ?? '')
   const [description, setDescription] = useState(initial?.product.description ?? '')
+  const [details, setDetails] = useState(initial?.product.details ?? '')
   const [categoryId, setCategoryId] = useState(initial?.product.category_id ?? '')
   const [price, setPrice] = useState(initial ? String(initial.product.price) : '')
   const [compareAt, setCompareAt] = useState(
@@ -143,6 +144,7 @@ export default function ProductForm({ initial }: Props) {
       const payload = {
         name: name.trim(),
         description: description.trim() || null,
+        details: details.trim() || null,
         category_id: categoryId,
         price: Number(price),
         compare_at_price: compareAt ? Number(compareAt) : null,
@@ -291,6 +293,22 @@ export default function ProductForm({ initial }: Props) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
+          </div>
+          <div>
+            <label className={labelClass}>
+              Product details <span className="font-normal text-gray-400">(optional, one point per line)</span>
+            </label>
+            <textarea
+              className={inputClass}
+              rows={4}
+              placeholder={'Cotton blend, soft and breathable\nOversized fit\nWashed and ready to wear'}
+              value={details}
+              onChange={(e) => setDetails(e.target.value)}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Shown as a list on the product page, with the category, colours, sizes and availability added
+              automatically.
+            </p>
           </div>
           <div>
             <label className={labelClass}>Category</label>

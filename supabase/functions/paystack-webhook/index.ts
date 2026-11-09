@@ -1,9 +1,9 @@
-// Paystack calls this itself when a payment succeeds, even if the customer closed the tab.
+// Paystack calls this itself when something happens to a payment, even if the customer closed the tab.
 // Deploy:  npx supabase functions deploy paystack-webhook --no-verify-jwt
 // Then in the Paystack dashboard: Settings > API Keys & Webhooks > set the webhook URL to
 //   https://YOUR-PROJECT-REF.supabase.co/functions/v1/paystack-webhook
 // @ts-nocheck
-import { json, verifyAndMarkPaid } from '../_shared/paystack.ts'
+import { applyRefundEvent, json, openIssue, resolveIssues, verifyAndMarkPaid } from '../_shared/paystack.ts'
 
 const toHex = (buf: ArrayBuffer) =>
   [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
@@ -15,6 +15,8 @@ function safeEqual(a: string, b: string): boolean {
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
   return diff === 0
 }
+
+const REFUND_EVENTS = ['refund.pending', 'refund.processing', 'refund.processed', 'refund.failed', 'refund.needs-attention']
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
@@ -36,15 +38,37 @@ Deno.serve(async (req) => {
 
   const event = JSON.parse(raw)
 
-  if (event.event === 'charge.success') {
-    const orderId = event.data?.metadata?.order_id
-    const reference = event.data?.reference
-    if (orderId && reference) {
-      const result = await verifyAndMarkPaid(String(orderId), String(reference))
-      console.log('Webhook result', orderId, result)
-      // A 500 makes Paystack retry later. Worth it for a real failure; pointless for "already paid".
-      if (result.status === 'error') return json({ error: result.message }, 500)
+  try {
+    if (event.event === 'charge.success') {
+      const orderId = event.data?.metadata?.order_id
+      const reference = event.data?.reference
+      if (orderId && reference) {
+        const result = await verifyAndMarkPaid(String(orderId), String(reference))
+        console.log('Webhook result', orderId, result)
+        // A 500 makes Paystack retry later. Worth it for a transient failure (we could not reach Paystack,
+        // the database hiccupped). Mismatches and failed refunds are already saved for the owner, so
+        // those answer 200: retrying cannot fix them.
+        if (result.status === 'error') return json({ error: result.message }, 500)
+      }
+    } else if (REFUND_EVENTS.includes(event.event)) {
+      await applyRefundEvent(event.event, event.data)
+    } else if (event.event === 'charge.dispute.create') {
+      // [verify] payload shape against a real dispute event.
+      const reference = event.data?.transaction?.reference ?? event.data?.transaction_reference ?? null
+      await openIssue({
+        orderId: event.data?.transaction?.metadata?.order_id ?? null,
+        reference,
+        kind: 'dispute',
+        detail: 'A customer opened a dispute (chargeback) on this payment. Respond in the Paystack dashboard before the deadline.',
+        raw: event.data,
+      })
+    } else if (event.event === 'charge.dispute.resolve') {
+      const reference = event.data?.transaction?.reference ?? event.data?.transaction_reference
+      if (reference) await resolveIssues(String(reference), ['dispute'])
     }
+  } catch (err) {
+    console.error('Webhook handler crashed', event.event, err)
+    return json({ error: 'Handler failed' }, 500) // let Paystack retry
   }
 
   return json({ received: true }) // always answer 200 for events we don't care about

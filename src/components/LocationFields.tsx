@@ -25,12 +25,12 @@ export default function LocationFields({ text, place, note, bias, onTextChange, 
           onTextChange={onTextChange}
           onPick={onPick}
           bias={bias}
-          placeholder="Start typing your address…"
+          placeholder="e.g Ada George Road, Port-Harcourt"
         />
         {text.trim().length > 0 && !place ? (
-          <p className="mt-1 text-xs text-amber-600">Pick your address from the suggestions so we can find it on the map.</p>
+          <p className="hidden mt-1 text-xs text-amber-600">Pick your address from the suggestions so we can find it on the map.</p>
         ) : (
-          <p className="mt-1 text-xs text-gray-400">Start typing, then choose your address from the list.</p>
+          <p className="hidden mt-1 text-xs text-gray-400 ">Start typing, then choose your address from the list.</p>
         )}
       </div>
 

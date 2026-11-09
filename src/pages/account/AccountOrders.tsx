@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
+import { ListSkeleton } from '../../components/Skeleton'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { formatNaira } from '../../lib/format'
 import { useAuth } from '../../context/AuthContext'
+import { useMyReviewedOrderIds } from '../../hooks/useReviews'
 import type { Order } from '../../lib/types'
 
 type MyOrder = Pick<Order, 'id' | 'order_number' | 'total' | 'status' | 'created_at'>
@@ -27,6 +29,7 @@ const STATUS_STYLE: Record<Order['status'], string> = {
 
 export default function AccountOrders() {
   const { user } = useAuth()
+  const { data: reviewedIds } = useMyReviewedOrderIds()
 
   const { data: orders, isLoading, error } = useQuery({
     queryKey: ['my-orders', user?.id],
@@ -47,7 +50,7 @@ export default function AccountOrders() {
     <div className="mx-auto max-w-xl">
       <h1 className="mb-4 text-2xl font-bold">Orders</h1>
 
-      {isLoading && <p className="text-gray-400">Loading your orders…</p>}
+      {isLoading && <ListSkeleton rows={4} />}
       {error && <p className="text-red-600">Couldn't load your orders.</p>}
 
       {orders && orders.length === 0 && (
@@ -77,6 +80,9 @@ export default function AccountOrders() {
                 <span className={`mt-0.5 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLE[o.status]}`}>
                   {STATUS_LABEL[o.status]}
                 </span>
+                {o.status === 'delivered' && reviewedIds && !reviewedIds.includes(o.id) && (
+                  <p className="mt-1 text-xs font-medium text-brand">★ Rate this order</p>
+                )}
               </div>
             </Link>
           </li>

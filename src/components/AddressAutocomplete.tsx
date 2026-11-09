@@ -46,7 +46,7 @@ export default function AddressAutocomplete({ value, onTextChange, onPick, bias,
       } finally {
         setLoading(false)
       }
-    }, 300)
+    }, 0)
 
     return () => {
       clearTimeout(timer)
