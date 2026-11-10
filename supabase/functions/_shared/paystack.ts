@@ -1,7 +1,7 @@
 // Shared helpers for the Paystack functions.
 // The IMPORTANT rule of online payments lives here, in one place:
 //   never believe the browser about whether someone paid. Ask Paystack directly.
-// @ts-nocheck
+//@ts-nocheck
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 // Powerful key: stays on the server, never in the browser.
@@ -65,6 +65,30 @@ async function alertOwner(subject: string, html: string) {
   }
 }
 
+// Push notification to the owner's phone, through notify-order (which owns the device list). Best effort.
+async function pushOwner(title: string, body: string) {
+  const secret = Deno.env.get('WEBHOOK_SECRET')
+  if (!secret) return
+  try {
+    const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/notify-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-webhook-secret': secret },
+      body: JSON.stringify({ kind: 'alert', title, body }),
+    })
+    if (!res.ok) console.error('Owner push failed:', res.status, await res.text())
+  } catch (err) {
+    console.error('Owner push failed:', err)
+  }
+}
+
+const ISSUE_TITLE: Record<string, string> = {
+  refund_failed: 'Refund failed',
+  refund_needs_attention: 'Refund needs customer bank details',
+  payment_mismatch: 'Wrong amount paid',
+  dispute: 'Customer dispute',
+  other: 'Payment needs attention',
+}
+
 export type IssueKind = 'refund_failed' | 'refund_needs_attention' | 'payment_mismatch' | 'dispute' | 'other'
 
 // Saves a problem the owner must look at, and emails them ONCE per open issue
@@ -90,6 +114,7 @@ export async function openIssue(i: {
   })
   if (error) console.error('Could not save payment issue:', error, i)
 
+  await pushOwner(ISSUE_TITLE[i.kind] ?? 'Payment needs attention', i.detail.slice(0, 140))
   await alertOwner(
     `Payment needs attention: ${i.kind.replace(/_/g, ' ')}`,
     `<p>${esc(i.detail)}</p><p>Paystack reference: <b>${esc(i.reference ?? 'n/a')}</b></p>` +
@@ -162,7 +187,11 @@ async function saveRefundResult(orderId: string, reference: string, data: any): 
 
   // Never move an order backwards (e.g. a late "pending" after "processed").
   const orderStatus = status === 'processed' ? 'refunded' : status === 'failed' ? 'refund_failed' : 'refund_pending'
-  const update = admin.from('orders').update({ payment_status: orderStatus }).eq('id', orderId)
+  // Tells the customer (on their order page) to contact customer care with their bank details.
+  const fields: Record<string, unknown> = { payment_status: orderStatus }
+  if (status === 'needs-attention') fields.refund_needs_details = true
+  if (status === 'processed') fields.refund_needs_details = false
+  const update = admin.from('orders').update(fields).eq('id', orderId)
   await (orderStatus === 'refund_pending' ? update.neq('payment_status', 'refunded') : update)
   if (status === 'processed') await resolveIssues(reference, ['refund_failed', 'refund_needs_attention'])
   return status
@@ -283,13 +312,17 @@ export async function applyRefundEvent(eventName: string, data: any) {
   if (!orderId) return
 
   if (status === 'processed') {
-    await admin.from('orders').update({ payment_status: 'refunded' }).eq('id', orderId)
+    await admin.from('orders').update({ payment_status: 'refunded', refund_needs_details: false }).eq('id', orderId)
     await resolveIssues(reference, ['refund_failed', 'refund_needs_attention'])
   } else if (status === 'failed') {
     await admin.from('orders').update({ payment_status: 'refund_failed' }).eq('id', orderId)
     await openIssue({ orderId, reference, kind: 'refund_failed', detail: 'Paystack reported that the refund failed.', raw: data })
   } else {
-    await admin.from('orders').update({ payment_status: 'refund_pending' }).eq('id', orderId).neq('payment_status', 'refunded')
+    await admin
+      .from('orders')
+      .update({ payment_status: 'refund_pending', ...(status === 'needs-attention' ? { refund_needs_details: true } : {}) })
+      .eq('id', orderId)
+      .neq('payment_status', 'refunded')
     if (status === 'needs-attention') {
       await openIssue({
         orderId,

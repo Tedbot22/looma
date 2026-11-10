@@ -32,6 +32,7 @@ import AdminDelivery from './pages/admin/AdminDelivery'
 import AdminBanners from './pages/admin/AdminBanners'
 import AdminStore from './pages/admin/AdminStore'
 import AdminReviews from './pages/admin/AdminReviews'
+import AdminPaymentIssues from './pages/admin/AdminPaymentIssues'
 import ComingSoon from './pages/ComingSoon'
 import RiderDelivery from './pages/RiderDelivery'
 
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="store" element={<AdminStore />} />
           <Route path="vouchers" element={<AdminCoupons />} />
           <Route path="reviews" element={<AdminReviews />} />
+          <Route path="payments" element={<AdminPaymentIssues />} />
         </Route>
 
         {/* Rider delivery page: no login, no store header/footer. The secret link is the credential. */}

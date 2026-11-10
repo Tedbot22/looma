@@ -8,7 +8,7 @@
 //
 // Deploy with:  npx supabase functions deploy notify-order --no-verify-jwt
 // (--no-verify-jwt because the database trigger has no user login. We check access ourselves below.)
-// @ts-nocheck
+//@ts-nocheck
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const supabase = createClient(
@@ -193,6 +193,13 @@ async function notifyOrder(orderId: string): Promise<Response> {
   return json({ pushed, emailed })
 }
 
+// A plain push to the owner's devices (used for payment problems; the email is sent by the caller).
+async function pushAlert(title: string, text: string): Promise<Response> {
+  const { data: devices } = await supabase.from('device_tokens').select('id, token')
+  const { sent } = await pushToDevices(devices ?? [], { title, body: text, tag: `alert-${Date.now()}`, url: '/admin/payments' })
+  return json({ pushed: sent })
+}
+
 // Tells the owner an order was cancelled, so nobody prepares or delivers it.
 // Not "claimed" like new orders: every cancellation is announced once, by cancel-order.
 async function notifyCancelled(orderId: string, refund: string, byCustomer: boolean): Promise<Response> {
@@ -294,6 +301,9 @@ Deno.serve(async (req) => {
 
   // Path 1: the database trigger, proven by a shared secret.
   const secret = req.headers.get('x-webhook-secret')
+  if (secret && secret === Deno.env.get('WEBHOOK_SECRET') && body.kind === 'alert') {
+    return await pushAlert(String(body.title ?? 'Payment needs attention'), String(body.body ?? ''))
+  }
   if (secret && secret === Deno.env.get('WEBHOOK_SECRET') && body.order_id) {
     if (body.kind === 'cancelled') {
       return await notifyCancelled(String(body.order_id), String(body.refund ?? 'none'), body.by_customer === true)

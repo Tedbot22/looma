@@ -1,5 +1,7 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { ExternalLink } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../lib/supabase'
 import { STORE_NAME } from '../../config'
 import PushToggle from './PushToggle'
 
@@ -9,6 +11,16 @@ const tabClass = ({ isActive }: { isActive: boolean }) =>
   }`
 
 export default function AdminLayout() {
+  // How many payment problems are waiting for the owner (shown as a count on the tab).
+  const { data: openIssues } = useQuery({
+    queryKey: ['payment-issues-count'],
+    queryFn: async () => {
+      const { count } = await supabase.from('payment_issues').select('id', { count: 'exact', head: true }).is('resolved_at', null)
+      return count ?? 0
+    },
+    refetchInterval: 30_000,
+  })
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="border-b border-gray-200 bg-white">
@@ -21,6 +33,12 @@ export default function AdminLayout() {
         <nav className="mx-auto flex max-w-4xl gap-2 overflow-x-auto px-4 pb-3">
           <NavLink to="/admin" end className={tabClass}>
             Orders
+          </NavLink>
+          <NavLink to="/admin/payments" className={tabClass}>
+            Payments
+            {!!openIssues && (
+              <span className="ml-1.5 rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white">{openIssues}</span>
+            )}
           </NavLink>
           <NavLink to="/admin/products" className={tabClass}>
             Products

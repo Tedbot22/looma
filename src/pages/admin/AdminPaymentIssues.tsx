@@ -28,7 +28,7 @@ const KIND_HELP: Partial<Record<PaymentIssue['kind'], string>> = {
   refund_failed:
     'Press Retry. If it keeps failing, check that your Paystack balance or pending payout can cover the refund, or refund it from the Paystack dashboard using the reference.',
   refund_needs_attention:
-    'Paystack needs the customer’s bank details. Ask the customer for them, then submit them on the Paystack dashboard (search the reference).',
+    'Paystack can’t refund this to its source. The customer has been told on their order page to contact customer care. Collect their bank details on WhatsApp, then submit them on the Paystack dashboard (search the reference). This clears itself when the refund completes.',
   payment_mismatch: 'The payment was refunded automatically. Check with the customer, then mark this resolved.',
   dispute: 'Respond to the dispute on the Paystack dashboard before the deadline.',
 }

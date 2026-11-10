@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase'
 import { formatNaira } from '../../lib/format'
 import { whatsappLinkTo } from '../../lib/whatsapp'
 import { formatKm, routeUrl } from '../../lib/delivery'
+import { cancelOrder } from '../../lib/payments'
 import type { OrderWithItems } from '../../lib/types'
 import AdminDeliveryPanel from '../../components/AdminDeliveryPanel'
 import { ACTIVE_STATUSES, type DeliveryAssignment } from '../../lib/adminDelivery'
@@ -48,6 +49,7 @@ const ERROR_TEXT: Record<string, string> = {
   ORDER_CLOSED: 'This order is already delivered or cancelled.',
   INVALID_TRANSITION: "That change isn't allowed for this order's current status.",
   NOT_ADMIN: "You don't have permission to do that.",
+  USE_CANCEL_ORDER: 'Use the Cancel button, so any payment is refunded.',
 }
 
 function friendlyError(message: string): string {
@@ -87,7 +89,7 @@ export default function AdminOrders() {
       note,
     }: {
       id: string
-      status: 'confirmed' | 'out_for_delivery' | 'delivered' | 'cancelled'
+      status: 'confirmed' | 'out_for_delivery' | 'delivered'
       note?: string
     }) => {
       const { error } = await supabase.rpc('set_order_status', {
@@ -102,6 +104,18 @@ export default function AdminOrders() {
       queryClient.invalidateQueries({ queryKey: ['admin-orders'] })
     },
     onError: (err) => toast.error(friendlyError((err as Error).message)),
+  })
+
+  // Cancelling goes through the server so a paid order is refunded and stock is restored together.
+  const cancelMutation = useMutation({
+    mutationFn: ({ id, note }: { id: string; note: string }) => cancelOrder(id, note),
+    onSuccess: (result) => {
+      if (result.refund === 'failed') toast.warning(result.message)
+      else toast.success(result.message)
+      queryClient.invalidateQueries({ queryKey: ['admin-orders'] })
+      queryClient.invalidateQueries({ queryKey: ['payment-issues'] })
+    },
+    onError: (err) => toast.error((err as Error).message),
   })
 
   // The note is shown to the customer on their tracking page (e.g. who is bringing the order).
@@ -125,8 +139,14 @@ export default function AdminOrders() {
   }
 
   function cancel(order: AdminOrder) {
-    if (!window.confirm(`Cancel order #${order.order_number}? Its items will go back into stock.`)) return
-    updateStatus.mutate({ id: order.id, status: 'cancelled' })
+    const refundable = order.payment_method === 'online' && order.payment_status === 'paid'
+    const warning = refundable
+      ? `Cancel order #${order.order_number}? Its items go back into stock and ${formatNaira(order.total)} is refunded to the customer.`
+      : `Cancel order #${order.order_number}? Its items will go back into stock.`
+    if (!window.confirm(warning)) return
+    const note = window.prompt('Reason for the customer (optional). They will see it on their order page:')
+    if (note === null) return // changed their mind
+    cancelMutation.mutate({ id: order.id, note })
   }
 
   return (
@@ -195,7 +215,7 @@ export default function AdminOrders() {
                   Total{' '}
                   <span className="font-normal text-gray-400">
                     ({order.payment_method === 'on_delivery' ? 'pay on delivery' : 'online'},{' '}
-                    {order.payment_status})
+                    {order.payment_status.replace('_', ' ')})
                   </span>
                 </span>
                 <span>{formatNaira(order.total)}</span>
@@ -297,7 +317,7 @@ export default function AdminOrders() {
                 )}
                 {!closed && (
                   <button
-                    disabled={updateStatus.isPending}
+                    disabled={updateStatus.isPending || cancelMutation.isPending}
                     onClick={() => cancel(order)}
                     className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
                   >

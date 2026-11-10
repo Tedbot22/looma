@@ -53,6 +53,7 @@ export interface Order {
   total: number
   payment_method: 'online' | 'on_delivery'
   payment_status: 'pending' | 'paid' | 'failed' | 'refund_pending' | 'refunded' | 'refund_failed'
+  refund_needs_details: boolean
   status: 'pending_payment' | 'placed' | 'confirmed' | 'out_for_delivery' | 'delivered' | 'cancelled'
   subtotal: number
   delivery_fee: number

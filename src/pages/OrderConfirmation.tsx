@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { OrderSkeleton } from '../components/Skeleton'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
-import { CheckCircle2, Clock, MessageCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock, MessageCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { formatNaira } from '../lib/format'
 import { whatsappLink } from '../lib/whatsapp'
-import { startPayment, verifyPayment } from '../lib/payments'
+import { cancelOrder, startPayment, verifyPayment } from '../lib/payments'
 import OrderTimeline from '../components/OrderTimeline'
 import DeliveryQr from '../components/DeliveryQr'
 import { OrderReviewSection } from '../components/RateOrder'
@@ -29,6 +29,8 @@ export default function OrderConfirmation() {
   const [params, setParams] = useSearchParams()
   const [paying, setPaying] = useState(false)
   const verifying = useRef(false)
+  // Stays on screen (a toast disappears in seconds) when we could not confirm a payment.
+  const [paymentProblem, setPaymentProblem] = useState<{ reference: string; message: string } | null>(null)
 
   const justOrdered = (location.state as { justOrdered?: boolean } | null)?.justOrdered === true
   // Paystack sends the customer back with ?reference=... (and ?trxref=...).
@@ -93,25 +95,55 @@ export default function OrderConfirmation() {
     if (!orderId || !reference || verifying.current) return
     verifying.current = true
 
+    const showProblem = (message: string) => setPaymentProblem({ reference, message })
+
     verifyPayment(orderId, reference)
       .then((result) => {
         if (result.status === 'paid' || result.status === 'already_paid') {
+          setPaymentProblem(null)
           toast.success('Payment received. Thank you!')
         } else if (result.status === 'not_paid') {
-          toast.error("We couldn't confirm a payment. If you were charged, it will be sorted out shortly.")
+          showProblem("We couldn't confirm a payment for this attempt. If you were charged, don't pay again: send us the reference below and we'll sort it out.")
         } else if (result.status === 'refunded') {
-          toast.error('Your order expired before the payment arrived, so the payment was refunded.')
+          showProblem('Your order was cancelled before the payment arrived, so the payment is being refunded. This can take a few business days.')
+        } else if (result.status === 'duplicate_refunded') {
+          toast.success('Your order is paid. You were charged twice by mistake, and the extra payment is being refunded.')
+        } else if (result.status === 'mismatch') {
+          showProblem(result.message ?? 'The amount paid did not match your order, so it is being refunded.')
+        } else if (result.status === 'refund_failed') {
+          showProblem(result.message ?? 'There was a problem with your payment. The store has been alerted and will sort it out.')
         } else {
-          toast.error(result.message ?? 'We could not confirm your payment yet.')
+          showProblem(result.message ?? 'We could not confirm your payment yet. If you were charged, send us the reference below.')
         }
       })
-      .catch((err) => toast.error((err as Error).message))
+      .catch((err) => showProblem((err as Error).message))
       .finally(() => {
         queryClient.invalidateQueries({ queryKey: ['order', orderId] })
         queryClient.invalidateQueries({ queryKey: ['order-events', orderId] })
         setParams({}, { replace: true }) // tidy the address bar
       })
   }, [orderId, reference, queryClient, setParams])
+
+  const cancelMutation = useMutation({
+    mutationFn: () => cancelOrder(orderId!),
+    onSuccess: (result) => {
+      if (result.refund === 'failed') toast.warning(result.message)
+      else toast.success(result.message)
+    },
+    onError: (err) => toast.error((err as Error).message),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['order', orderId] })
+      queryClient.invalidateQueries({ queryKey: ['order-events', orderId] })
+    },
+  })
+
+  function cancelThisOrder() {
+    const paidOnline = order?.payment_method === 'online' && order?.payment_status === 'paid'
+    const question = paidOnline
+      ? 'Cancel this order? Your payment will be refunded, which can take a few business days.'
+      : 'Cancel this order?'
+    if (window.confirm(question)) cancelMutation.mutate()
+  }
 
   async function payNow() {
     if (!orderId) return
@@ -163,6 +195,55 @@ export default function OrderConfirmation() {
           Order <span className="font-semibold">#{order.order_number}</span> · {STATUS_LABEL[order.status]}
         </p>
       </div>
+
+      {order.refund_needs_details && (
+        <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 shrink-0 text-amber-600" size={20} />
+            <div className="text-sm text-amber-900">
+              <p className="font-semibold">We need your bank details to finish your refund</p>
+              <p className="mt-1">
+                Your payment method can’t be refunded automatically. Please contact customer care and send us your account name,
+                account number and bank. You can also tell us about any problem with the order.
+              </p>
+              <a
+                href={whatsappLink(
+                  `Hi! My refund for order #${order.order_number} (ID: ${order.id}) needs my bank details. I would like to send them now.`
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700"
+              >
+                <MessageCircle size={16} /> Contact customer care
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {paymentProblem && (
+        <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 shrink-0 text-red-600" size={20} />
+            <div className="min-w-0 text-sm text-red-900">
+              <p className="font-semibold">There was a problem with your payment</p>
+              <p className="mt-1">{paymentProblem.message}</p>
+              <p className="mt-3 text-xs text-red-700">Payment reference (keep this):</p>
+              <p className="break-all rounded bg-white px-2 py-1 font-mono text-xs text-gray-700">{paymentProblem.reference}</p>
+              <a
+                href={whatsappLink(
+                  `Hi! I had a problem paying for order #${order.order_number} (ID: ${order.id}). Payment reference: ${paymentProblem.reference}`
+                )}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700"
+              >
+                <MessageCircle size={16} /> Message us on WhatsApp
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
 
       {awaitingPayment && (
         <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-center">
@@ -240,9 +321,13 @@ export default function OrderConfirmation() {
                 ? 'Pay on delivery'
                 : order.payment_status === 'paid'
                   ? 'Paid online'
-                  : order.payment_status === 'refunded'
-                    ? 'Refunded'
-                    : 'Online (not paid yet)'}
+                  : order.payment_status === 'refund_pending'
+                    ? 'Refund in progress (can take a few business days)'
+                    : order.payment_status === 'refund_failed'
+                      ? 'Refund being arranged by the store'
+                      : order.payment_status === 'refunded'
+                        ? 'Refunded'
+                        : 'Online (not paid yet)'}
             </dd>
           </div>
           <div className="flex justify-between gap-4">
@@ -258,6 +343,16 @@ export default function OrderConfirmation() {
           </div>
         </dl>
       </div>
+
+      {(order.status === 'pending_payment' || order.status === 'placed' || order.status === 'confirmed') && (
+        <button
+          onClick={cancelThisOrder}
+          disabled={cancelMutation.isPending}
+          className="mt-6 w-full rounded-lg border border-red-200 py-3 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+        >
+          {cancelMutation.isPending ? 'Cancelling…' : 'Cancel this order'}
+        </button>
+      )}
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         <a
