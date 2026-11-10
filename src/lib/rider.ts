@@ -56,6 +56,19 @@ export type FailReason =
 export const getDelivery = (token: string) => call('rider_get_delivery', { p_token: token })
 export const startDelivery = (token: string) => call('rider_start_delivery', { p_token: token })
 export const verifyQr = (token: string, qr: string) => call('rider_verify_qr', { p_token: token, p_qr: qr })
+// Asks the server to TEXT a 6-digit code to the customer's phone. The code never comes back here.
+export async function requestOtpSms(token: string): Promise<Reply> {
+  try {
+    const { data, error } = await supabase.functions.invoke('send-delivery-otp', { body: { token } })
+    if (error || !data || typeof data !== 'object') return { ok: false, code: 'NETWORK' }
+    const reply = data as Record<string, unknown>
+    return { ...reply, ok: reply.ok === true, code: String(reply.code ?? 'ERROR') }
+  } catch {
+    return { ok: false, code: 'NETWORK' }
+  }
+}
+
+export const verifyOtp = (token: string, code: string) => call('rider_verify_otp', { p_token: token, p_code: code })
 export const completeDelivery = (token: string) => call('rider_complete_delivery', { p_token: token })
 export const reportFailed = (token: string, reason: FailReason, note: string) =>
   call('rider_report_failed', { p_token: token, p_reason: reason, p_note: note || null })
@@ -128,6 +141,42 @@ export const MESSAGES: Record<string, { title: string; text: string }> = {
   TOO_MANY_ATTEMPTS: {
     title: 'Too many wrong scans',
     text: 'Please wait about 10 minutes, then try again.',
+  },
+  OTP_INVALID: {
+    title: 'That code is not correct',
+    text: 'Check the 6 digits with the customer and try again. If they have not asked for a code yet, ask them to tap "Can\'t use the QR?" in their account.',
+  },
+  OTP_EXPIRED: {
+    title: 'That code has expired',
+    text: 'Ask the customer to get a new 6-digit code in their account.',
+  },
+  OTP_LOCKED: {
+    title: 'That code is now locked',
+    text: 'Too many wrong tries. Ask the customer to get a new 6-digit code, then enter the new one.',
+  },
+  OTP_COOLDOWN: {
+    title: 'A code was just sent',
+    text: 'Wait a moment before asking for another. Ask the customer to check their text messages.',
+  },
+  OTP_LIMIT: {
+    title: 'Too many codes requested',
+    text: 'No more codes can be sent for this delivery. Contact LOOMA so they can help verify it.',
+  },
+  SMS_FAILED: {
+    title: "The text couldn't be sent",
+    text: 'Check that the customer can receive text messages and try again. If it keeps failing, contact LOOMA.',
+  },
+  NO_PHONE: {
+    title: 'No usable phone number on this order',
+    text: 'We cannot text this customer. Contact LOOMA so they can help verify the delivery.',
+  },
+  ALREADY_VERIFIED: {
+    title: 'The customer is already verified',
+    text: 'Tap Confirm delivery to finish.',
+  },
+  OTP_FORMAT: {
+    title: 'Enter all 6 digits',
+    text: 'The code is 6 numbers long.',
   },
   NOT_VERIFIED: {
     title: "The customer's code has not been scanned yet",

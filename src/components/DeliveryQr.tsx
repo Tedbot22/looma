@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import QRCode from 'qrcode'
-import { CheckCircle2, Phone, QrCode, ShieldAlert } from 'lucide-react'
+import { CheckCircle2, MessageSquareText, Phone, QrCode, ShieldAlert } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 // The customer's side of delivery verification.
-// Shown on the order page only while a rider is assigned. The QR code is short-lived and
-// single-use: it is created when the customer taps the button, and the server (not this page)
-// decides whether a scan of it is valid.
+// Shown on the order page only while a rider is assigned. The customer shows a QR code for the
+// rider to scan. If that isn't possible, the RIDER can ask for a 6-digit code to be texted to the
+// phone number on the order: the customer doesn't need this page for that, and the code is never
+// shown on any screen. The server decides whether any code is valid.
 
 interface MyDelivery {
   status: 'assigned' | 'out_for_delivery' | 'qr_verified' | 'delivered' | 'failed' | 'cancelled' | 'reassigned'
@@ -18,15 +19,12 @@ interface MyDelivery {
   qr_verified: boolean
 }
 
-// The code held in memory only while it is on screen. Never stored, never put in the address bar.
-interface ShownQr {
-  image: string // the drawn QR as a picture
-  expiresAtMs: number // device time when it runs out, counted from the server's "seconds left"
-}
+// What is on screen right now. Held in memory only: never stored, never put in the address bar.
+type Shown = { image: string; expiresAtMs: number }
 
 const ERRORS: Record<string, string> = {
   NO_ACTIVE_DELIVERY: 'There is no active delivery for this order right now.',
-  ALREADY_VERIFIED: 'Your code was already scanned. Waiting for the rider to confirm.',
+  ALREADY_VERIFIED: 'Your delivery was already verified. Waiting for the rider to confirm.',
   TOO_MANY_CODES: "You've requested a lot of codes. Please wait a little while and try again.",
   ORDER_NOT_FOUND: "We couldn't find that order.",
   NOT_AUTHENTICATED: 'Please sign in again.',
@@ -39,13 +37,13 @@ function errorText(message: string | undefined): string {
 
 export default function DeliveryQr({ orderId }: { orderId: string }) {
   const queryClient = useQueryClient()
-  const [qr, setQr] = useState<ShownQr | null>(null)
+  const [shown, setShown] = useState<Shown | null>(null)
   const [now, setNow] = useState(Date.now())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Who is delivering, and how far verification has got. Checked often while a code is on screen,
-  // so the page reacts the moment the rider scans.
+  // so the page reacts the moment the rider verifies.
   const { data: delivery } = useQuery({
     queryKey: ['my-delivery', orderId],
     queryFn: async (): Promise<MyDelivery | null> => {
@@ -53,25 +51,25 @@ export default function DeliveryQr({ orderId }: { orderId: string }) {
       if (error) throw error
       return (data as MyDelivery | null) ?? null
     },
-    refetchInterval: qr ? 2500 : 8000,
+    refetchInterval: shown ? 2500 : 8000,
   })
 
-  // Countdown tick, only while a code is showing.
+  // Countdown tick, only while something is showing.
   useEffect(() => {
-    if (!qr) return
+    if (!shown) return
     const id = setInterval(() => setNow(Date.now()), 500)
     return () => clearInterval(id)
-  }, [qr])
+  }, [shown])
 
-  const secondsLeft = qr ? Math.max(0, Math.ceil((qr.expiresAtMs - now) / 1000)) : 0
-  const expired = !!qr && secondsLeft === 0
+  const secondsLeft = shown ? Math.max(0, Math.ceil((shown.expiresAtMs - now) / 1000)) : 0
+  const expired = !!shown && secondsLeft === 0
 
-  // Hide the code as soon as it is no longer useful: scanned, expired, or the delivery ended.
+  // Hide the code as soon as it is no longer useful: verified, expired, or the delivery ended.
   useEffect(() => {
-    if (!qr) return
-    if (expired || delivery?.qr_verified || (delivery && !delivery.active)) setQr(null)
+    if (!shown) return
+    if (expired || delivery?.qr_verified || (delivery && !delivery.active)) setShown(null)
     if (expired) setError('That code has expired. Tap the button for a new one.')
-  }, [qr, expired, delivery])
+  }, [shown, expired, delivery])
 
   // Once the delivery is finished, refresh the order so the page shows "Delivered".
   useEffect(() => {
@@ -81,6 +79,7 @@ export default function DeliveryQr({ orderId }: { orderId: string }) {
     }
   }, [delivery?.status, orderId, queryClient])
 
+  // Makes a fresh QR code. Making one cancels any earlier one.
   async function showQr() {
     if (busy) return
     setBusy(true)
@@ -94,7 +93,7 @@ export default function DeliveryQr({ orderId }: { orderId: string }) {
       const reply = data as { token: string; expires_in_seconds: number }
       const image = await QRCode.toDataURL(reply.token, { width: 320, margin: 2, errorCorrectionLevel: 'M' })
       setNow(Date.now())
-      setQr({ image, expiresAtMs: Date.now() + reply.expires_in_seconds * 1000 })
+      setShown({ image, expiresAtMs: Date.now() + reply.expires_in_seconds * 1000 })
       queryClient.invalidateQueries({ queryKey: ['my-delivery', orderId] })
     } catch {
       setError(errorText(undefined))
@@ -122,15 +121,15 @@ export default function DeliveryQr({ orderId }: { orderId: string }) {
         <div role="status" className="mt-4 flex gap-3 rounded-lg bg-white p-3 text-sm text-green-800">
           <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-green-600" />
           <p>
-            <span className="font-semibold">Your code was scanned.</span> The rider is finishing the delivery now.
+            <span className="font-semibold">Your code was accepted.</span> The rider is finishing the delivery now.
           </p>
         </div>
-      ) : qr ? (
+      ) : shown ? (
         <div className="mt-4 text-center">
           <div className="inline-block rounded-xl bg-white p-3 shadow-sm">
-            <img src={qr.image} alt="Your delivery QR code" width={288} height={288} className="mx-auto" />
+            <img src={shown.image} alt="Your delivery QR code" width={288} height={288} className="mx-auto" />
           </div>
-          <p className="mt-2 text-sm font-medium tabular-nums" aria-live="off">
+          <p className="mt-2 text-sm font-medium tabular-nums">
             Expires in {mins}:{secs}
           </p>
           <p className="mt-1 text-xs text-gray-600">Turn your screen brightness up and let the rider scan this code.</p>
@@ -144,8 +143,16 @@ export default function DeliveryQr({ orderId }: { orderId: string }) {
           >
             <QrCode size={18} /> {busy ? 'Creating your code…' : 'Show Delivery QR'}
           </button>
-          <p className="mt-2 text-xs text-gray-600">Tap this only when the rider is with you.</p>
+          <p className="mt-2 text-xs text-gray-600">Do this only when the rider is with you.</p>
         </div>
+      )}
+
+      {!delivery.qr_verified && (
+        <p className="mt-3 flex gap-2 text-xs text-gray-600">
+          <MessageSquareText size={14} className="mt-0.5 shrink-0" />
+          Can't show the QR? Tell your rider. They can text a 6-digit code to the phone number on your order, and you read
+          it out to them.
+        </p>
       )}
 
       {error && (
@@ -156,7 +163,8 @@ export default function DeliveryQr({ orderId }: { orderId: string }) {
 
       <p className="mt-4 flex gap-2 text-xs text-gray-600">
         <ShieldAlert size={14} className="mt-0.5 shrink-0" />
-        Never send a screenshot of this code or show it to anyone but your rider. It can only be used once.
+        Never send a screenshot or share a code with anyone except the rider standing with you. Each code can only be
+        used once.
       </p>
     </section>
   )

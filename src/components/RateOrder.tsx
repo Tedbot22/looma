@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, X } from 'lucide-react'
 import { StarPicker } from '../components/StarRating'
 import { useOrderReview } from '../hooks/useReviews'
@@ -46,6 +48,14 @@ export default function RateOrder({
 // For the order page: the rating card if they haven't reviewed yet, a thank-you if they have.
 export function OrderReviewSection({ orderId, orderNumber }: { orderId: string; orderNumber: number }) {
   const { data: review, isLoading } = useOrderReview(orderId)
+  const queryClient = useQueryClient()
+
+  // This section only appears once the order is delivered. The floating prompt keeps its list of
+  // delivered orders for a few minutes, so refresh it now rather than let it miss this order.
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ['review-prompt-orders'] })
+  }, [queryClient])
+
   if (isLoading) return null
 
   if (review) {

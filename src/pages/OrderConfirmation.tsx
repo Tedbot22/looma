@@ -10,6 +10,7 @@ import { whatsappLink } from '../lib/whatsapp'
 import { startPayment, verifyPayment } from '../lib/payments'
 import OrderTimeline from '../components/OrderTimeline'
 import DeliveryQr from '../components/DeliveryQr'
+import { OrderReviewSection } from '../components/RateOrder'
 import type { OrderEvent, OrderWithItems } from '../lib/types'
 
 const STATUS_LABEL: Record<OrderWithItems['status'], string> = {
@@ -182,6 +183,13 @@ export default function OrderConfirmation() {
       {/* Delivery verification: appears only while a rider is assigned */}
       {!awaitingPayment && order.status !== 'cancelled' && order.status !== 'delivered' && (
         <DeliveryQr orderId={order.id} />
+      )}
+
+      {/* Once delivered (the QR block above is gone by then): invite a voluntary review */}
+      {order.status === 'delivered' && (
+        <div className="mt-6">
+          <OrderReviewSection orderId={order.id} orderNumber={order.order_number} />
+        </div>
       )}
 
       {/* Tracking */}

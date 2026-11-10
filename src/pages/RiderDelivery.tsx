@@ -9,8 +9,8 @@ import { formatNaira } from '../lib/format'
 import { whatsappLink } from '../lib/whatsapp'
 import { STORE_NAME } from '../config'
 import {
-  DEAD_LINK_CODES, FAIL_REASONS, completeDelivery, getDelivery, messageFor, reportFailed, startDelivery, verifyQr,
-  type FailReason, type RiderDelivery,
+  DEAD_LINK_CODES, FAIL_REASONS, completeDelivery, getDelivery, messageFor, reportFailed, requestOtpSms, startDelivery, verifyOtp, verifyQr,
+  type FailReason, type Reply, type RiderDelivery,
 } from '../lib/rider'
 
 // The rider's page. No login: the secret link is the credential.
@@ -62,6 +62,11 @@ export default function RiderDeliveryPage() {
   const [showFail, setShowFail] = useState(false)
   const [failReason, setFailReason] = useState<FailReason | ''>('')
   const [failNote, setFailNote] = useState('')
+  const [otpOpen, setOtpOpen] = useState(false)
+  const [otpSent, setOtpSent] = useState<{ hint: string | null; resendAtMs: number } | null>(null)
+  const [now, setNow] = useState(Date.now())
+  const [otp, setOtp] = useState('')
+  const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null)
   const busyRef = useRef(false) // blocks double taps before React re-renders
 
   // Reads the current state from the server. `quiet` keeps what's on screen if the network drops.
@@ -93,22 +98,32 @@ export default function RiderDeliveryPage() {
   }, [load])
 
   // Runs one server action with double-tap protection and shared error handling.
-  async function act(run: () => Promise<{ ok: boolean; code: string }>, onOk: (code: string) => void | Promise<void>) {
+  async function act(
+    run: () => Promise<Reply>,
+    onOk: (code: string, reply: Reply) => void | Promise<void>,
+    onFail?: (reply: Reply) => boolean // return true if the caller dealt with it
+  ) {
     if (busyRef.current) return
     busyRef.current = true
     setBusy(true)
     setProblem(null)
     setNotice(null)
+    setAttemptsLeft(null)
     try {
       const reply = await run()
       if (reply.ok) {
-        await onOk(reply.code)
+        await onOk(reply.code, reply)
       } else if (reply.code === 'ALREADY_DELIVERED') {
         setView({ kind: 'delivered', already: true })
       } else if (DEAD_LINK_CODES.includes(reply.code)) {
         setView({ kind: 'closed', code: reply.code })
+      } else if (onFail?.(reply)) {
+        // handled by the caller
+      } else if (reply.code === 'ALREADY_VERIFIED') {
+        await load(true) // someone already verified: show the Confirm step
       } else {
         setProblem(reply.code)
+        setAttemptsLeft(typeof reply.attempts_left === 'number' ? reply.attempts_left : null)
         if (reply.code === 'VERIFICATION_EXPIRED') await load(true) // status went back a step
       }
     } finally {
@@ -129,6 +144,47 @@ export default function RiderDeliveryPage() {
       }
     )
   }
+
+  // Backup to the QR: we TEXT a 6-digit code to the customer's phone and they read it out.
+  // The code never appears on this screen.
+  const sendOtp = () =>
+    act(
+      () => requestOtpSms(token),
+      (_code, reply) =>
+        setOtpSent({
+          hint: typeof reply.phone_hint === 'string' ? reply.phone_hint : null,
+          resendAtMs: Date.now() + Number(reply.cooldown_seconds ?? 60) * 1000,
+        }),
+      (reply) => {
+        if (reply.code !== 'OTP_COOLDOWN') return false
+        // A code was already texted a moment ago: go straight to typing it in.
+        setOtpSent((prev) => ({
+          hint: prev?.hint ?? null,
+          resendAtMs: Date.now() + Number(reply.retry_after_seconds ?? 60) * 1000,
+        }))
+        return true
+      }
+    )
+
+  // Counts down the "send again" wait while a code has been sent.
+  useEffect(() => {
+    if (!otpSent) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [otpSent])
+
+  // Typing in the code the customer read out.
+  const submitOtp = () =>
+    act(
+      () => verifyOtp(token, otp),
+      async () => {
+        setOtp('')
+        setOtpOpen(false)
+        setOtpSent(null)
+        setNotice("Customer's code accepted. Now tap Confirm delivery.")
+        await load(true)
+      }
+    )
 
   // The ONLY place the success screen appears: the server answered DELIVERED.
   const confirm = () =>
@@ -303,7 +359,19 @@ export default function RiderDeliveryPage() {
       </section>
 
       {/* Messages from the server */}
-      {problemMsg && <Banner tone="red" icon={<AlertTriangle size={22} />} title={problemMsg.title} text={problemMsg.text} />}
+      {problemMsg && (
+        <Banner
+          tone="red"
+          icon={<AlertTriangle size={22} />}
+          title={problemMsg.title}
+          text={
+            problemMsg.text +
+            (problem === 'OTP_INVALID' && attemptsLeft !== null
+              ? ` You have ${attemptsLeft} ${attemptsLeft === 1 ? 'try' : 'tries'} left for this code.`
+              : '')
+          }
+        />
+      )}
       {notice && !problemMsg && <Banner tone="green" icon={<CheckCircle2 size={22} />} title="QR verified" text={notice} />}
 
       {/* Actions */}
@@ -323,6 +391,75 @@ export default function RiderDeliveryPage() {
               Ask the customer to open this order in their {STORE_NAME} account and tap "Show Delivery QR". Do not hand
               over the order until the scan is accepted.
             </p>
+
+            {!otpOpen ? (
+              <button onClick={() => (setProblem(null), setOtpOpen(true))} className="w-full py-1 text-sm font-medium text-brand underline">
+                Customer can't show the QR? Text them a 6-digit code
+              </button>
+            ) : (
+              <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+                <p className="text-sm font-semibold">Verify with a 6-digit code</p>
+
+                {!otpSent ? (
+                  <>
+                    <p className="text-xs text-gray-500">
+                      We'll text a code to the phone number on this order. The customer reads it out to you. You won't see
+                      it until they tell you.
+                    </p>
+                    <button
+                      disabled={busy}
+                      onClick={sendOtp}
+                      className="w-full rounded-lg bg-brand px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+                    >
+                      {busy ? 'Sending…' : "Text the customer a code"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p role="status" className="text-sm text-green-800">
+                      {otpSent.hint
+                        ? `Code sent to the customer's phone (${otpSent.hint}).`
+                        : 'A code was sent to the customer a moment ago.'}{' '}
+                      Ask them to read it to you, then type it here.
+                    </p>
+                    <input
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      maxLength={6}
+                      placeholder="000000"
+                      aria-label="6-digit code from the customer"
+                      className="w-full rounded-lg border border-gray-300 py-3 text-center text-2xl font-semibold tracking-[0.4em]"
+                    />
+                    <button
+                      disabled={busy || otp.length !== 6}
+                      onClick={submitOtp}
+                      className="w-full rounded-lg bg-brand px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                    >
+                      {busy ? 'Checking…' : 'Check code'}
+                    </button>
+                    <button
+                      disabled={busy || now < otpSent.resendAtMs}
+                      onClick={sendOtp}
+                      className="w-full py-1 text-sm font-medium text-brand underline disabled:text-gray-400 disabled:no-underline"
+                    >
+                      {now < otpSent.resendAtMs
+                        ? `Send a new code in ${Math.ceil((otpSent.resendAtMs - now) / 1000)}s`
+                        : "Didn't get it? Send a new code"}
+                    </button>
+                  </>
+                )}
+
+                <button
+                  disabled={busy}
+                  onClick={() => (setOtpOpen(false), setOtp(''), setProblem(null))}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium"
+                >
+                  Back
+                </button>
+              </section>
+            )}
           </>
         )}
 

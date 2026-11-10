@@ -70,8 +70,11 @@ export const EVENT_LABEL: Record<string, string> = {
   rider_opened: 'Rider opened the link',
   delivery_started: 'Rider picked up the package',
   qr_generated: 'Customer showed a QR code',
-  qr_verification_failed: 'QR scan rejected',
-  qr_verified: 'QR scan accepted',
+  otp_requested: 'Rider asked for a 6-digit code by SMS',
+  otp_sms_sent: 'Code texted to the customer',
+  otp_sms_failed: 'Code text could not be sent',
+  qr_verification_failed: 'Customer check rejected',
+  qr_verified: 'Customer check accepted',
   verification_expired: 'Scan timed out before confirming',
   delivery_completed: 'Delivery completed',
   delivery_failed: 'Delivery failed',
@@ -84,15 +87,21 @@ const FAIL_CODE_TEXT: Record<string, string> = {
   QR_INVALID: 'not a valid code',
   QR_USED: 'already used',
   QR_EXPIRED: 'expired',
+  OTP_INVALID: 'wrong code',
+  OTP_EXPIRED: 'code expired',
+  OTP_LOCKED: 'code locked after too many wrong tries',
 }
 
 // A short extra detail for an event row, where there is one.
 export function eventDetail(e: DeliveryEvent): string | null {
   const d = e.detail
   if (!d) return null
-  if (typeof d.code === 'string') return FAIL_CODE_TEXT[d.code] ?? d.code
+  const method = d.method === 'otp' ? '6-digit code' : d.method === 'qr' ? 'QR' : null
+  if (typeof d.code === 'string') return [FAIL_CODE_TEXT[d.code] ?? d.code, method].filter(Boolean).join(', ')
   if (typeof d.reason === 'string' && d.reason) return d.reason.replace(/_/g, ' ')
+  if (typeof d.phone_hint === 'string' && d.phone_hint) return d.phone_hint
   if (typeof d.rider_name === 'string') return `${d.rider_name}${d.rider_phone ? ` · ${d.rider_phone}` : ''}`
+  if (method) return `by ${method}`
   return null
 }
 

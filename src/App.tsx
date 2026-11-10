@@ -18,6 +18,8 @@ import OrderConfirmation from './pages/OrderConfirmation'
 import ContentPage from './pages/ContentPage'
 import Contact from './pages/Contact'
 import Recommended from './pages/Recommended'
+import Reviews from './pages/Reviews'
+import SubmitReview from './pages/SubmitReview'
 import RequireAuth from './components/RequireAuth'
 import RequireAdmin from './components/RequireAdmin'
 import AdminLayout from './pages/admin/AdminLayout'
@@ -29,6 +31,7 @@ import AdminCoupons from './pages/admin/AdminCoupons'
 import AdminDelivery from './pages/admin/AdminDelivery'
 import AdminBanners from './pages/admin/AdminBanners'
 import AdminStore from './pages/admin/AdminStore'
+import AdminReviews from './pages/admin/AdminReviews'
 import ComingSoon from './pages/ComingSoon'
 import RiderDelivery from './pages/RiderDelivery'
 
@@ -53,6 +56,7 @@ export default function App() {
           <Route path="banners" element={<AdminBanners />} />
           <Route path="store" element={<AdminStore />} />
           <Route path="vouchers" element={<AdminCoupons />} />
+          <Route path="reviews" element={<AdminReviews />} />
         </Route>
 
         {/* Rider delivery page: no login, no store header/footer. The secret link is the credential. */}
@@ -109,6 +113,15 @@ export default function App() {
             element={
               <RequireAuth>
                 <OrderConfirmation />
+              </RequireAuth>
+            }
+          />
+          <Route path="/reviews" element={<Reviews />} />
+          <Route
+            path="/review/:orderId"
+            element={
+              <RequireAuth>
+                <SubmitReview />
               </RequireAuth>
             }
           />
