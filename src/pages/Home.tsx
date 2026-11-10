@@ -32,7 +32,7 @@ function Section({ title, subtitle, to, children }: { title: string; subtitle?: 
   )
 }
 
-const rowGrid = 'grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-4 sm:gap-x-6'
+const rowGrid = 'grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-6 md:grid-cols-4'
 
 export default function Home() {
   const { data: categories, isLoading: categoriesLoading } = useQuery({

@@ -21,6 +21,16 @@ export default function AdminLayout() {
     refetchInterval: 30_000,
   })
 
+  // How many customers the AI has handed over and are still waiting for the owner.
+  const { data: waiting } = useQuery({
+    queryKey: ['support-count'],
+    queryFn: async () => {
+      const { count } = await supabase.from('support_conversations').select('id', { count: 'exact', head: true }).eq('status', 'escalated')
+      return count ?? 0
+    },
+    refetchInterval: 30_000,
+  })
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="border-b border-gray-200 bg-white">
@@ -38,6 +48,12 @@ export default function AdminLayout() {
             Payments
             {!!openIssues && (
               <span className="ml-1.5 rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white">{openIssues}</span>
+            )}
+          </NavLink>
+          <NavLink to="/admin/support" className={tabClass}>
+            Support
+            {!!waiting && (
+              <span className="ml-1.5 rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white">{waiting}</span>
             )}
           </NavLink>
           <NavLink to="/admin/products" className={tabClass}>

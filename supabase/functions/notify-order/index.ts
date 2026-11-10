@@ -241,6 +241,77 @@ async function notifyCancelled(orderId: string, refund: string, byCustomer: bool
   return json({ pushed, emailed })
 }
 
+// A Nigerian number as digits for wa.me links: 0803... -> 234803...
+function waDigits(phone: string | null | undefined): string | null {
+  const d = String(phone ?? '').replace(/\D/g, '')
+  if (d.length === 13 && d.startsWith('234')) return d
+  if (d.length === 11 && d.startsWith('0')) return '234' + d.slice(1)
+  if (d.length === 10 && /^[789]/.test(d)) return '234' + d
+  return d.length >= 11 ? d : null
+}
+
+// Tells the owner a customer needs a human (an escalated AI customer-care chat).
+// The email carries the summary, the recent messages and a WhatsApp link to the customer.
+async function notifySupport(conversationId: string): Promise<Response> {
+  const { data: chat } = await supabase
+    .from('support_conversations')
+    .select('id, user_id, summary, escalation_reason, order_id, orders(order_number)')
+    .eq('id', conversationId)
+    .single()
+  if (!chat) return json({ error: 'chat not found' }, 404)
+
+  // deno-lint-ignore no-explicit-any
+  const c = chat as any
+  const { data: profile } = await supabase.from('profiles').select('full_name, phone').eq('id', c.user_id).single()
+  let phone: string | null = profile?.phone || null
+  if (!phone) {
+    const { data: o } = await supabase.from('orders').select('phone').eq('user_id', c.user_id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+    phone = o?.phone ?? null
+  }
+  const { data: authUser } = await supabase.auth.admin.getUserById(c.user_id)
+  const email = authUser?.user?.email ?? null
+  const name: string = profile?.full_name || 'A customer'
+
+  const { data: msgs } = await supabase
+    .from('support_messages')
+    .select('role, content')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: false })
+    .limit(10)
+  const transcript = (msgs ?? []).reverse()
+
+  const orderNo = c.orders?.order_number ? ` · order #${c.orders.order_number}` : ''
+  const summary = String(c.summary ?? 'The customer needs help.')
+  const digits = waDigits(phone)
+  const waLink = digits
+    ? `https://wa.me/${digits}?text=${encodeURIComponent(`Hi ${name}, this is ${Deno.env.get('STORE_NAME') ?? 'LOOMA'} replying to your message${c.orders?.order_number ? ` about order #${c.orders.order_number}` : ''}. `)}`
+    : null
+
+  const { data: devices } = await supabase.from('device_tokens').select('id, token')
+  const { sent: pushed } = await pushToDevices(devices ?? [], {
+    title: `${name} needs you${orderNo}`,
+    body: summary.slice(0, 160),
+    tag: `support-${conversationId}`,
+    url: '/admin/support',
+  })
+
+  const rows = transcript
+    .map((m: { role: string; content: string }) => `<p style="margin:4px 0"><b>${m.role === 'user' ? esc(name) : 'AI'}:</b> ${esc(m.content)}</p>`)
+    .join('')
+  const emailed = await sendEmail(
+    `${name} needs you${orderNo}`,
+    `<h2>${esc(name)} needs you${esc(orderNo)}</h2>
+     <p><b>Summary:</b> ${esc(summary)}</p>
+     <p><b>Why:</b> ${esc(String(c.escalation_reason ?? 'other').replace(/_/g, ' '))}<br>
+        <b>Phone:</b> ${esc(phone ?? 'none on file')}<br>
+        <b>Email:</b> ${esc(email ?? 'none')}</p>
+     ${waLink ? `<p><a href="${esc(waLink)}">Reply on WhatsApp</a></p>` : '<p>No phone number on file. Reply by email or from the admin.</p>'}
+     <h3>Recent chat</h3>${rows}
+     <p><a href="${esc(Deno.env.get('SITE_URL') ?? '')}/admin/support">Open the support inbox</a></p>`
+  )
+  return json({ pushed, emailed })
+}
+
 async function sendTest(authHeader: string | null): Promise<Response> {
   if (!authHeader?.startsWith('Bearer ')) {
     return json({ error: 'unauthorized', reason: 'No login token was sent. Log out and log in again.' }, 401)
@@ -303,6 +374,9 @@ Deno.serve(async (req) => {
   const secret = req.headers.get('x-webhook-secret')
   if (secret && secret === Deno.env.get('WEBHOOK_SECRET') && body.kind === 'alert') {
     return await pushAlert(String(body.title ?? 'Payment needs attention'), String(body.body ?? ''))
+  }
+  if (secret && secret === Deno.env.get('WEBHOOK_SECRET') && body.kind === 'support' && body.conversation_id) {
+    return await notifySupport(String(body.conversation_id))
   }
   if (secret && secret === Deno.env.get('WEBHOOK_SECRET') && body.order_id) {
     if (body.kind === 'cancelled') {

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Heart, ImageOff, ShoppingBag } from 'lucide-react'
+import { Heart, ImageOff, ShoppingCart } from 'lucide-react'
 import { toast } from 'sonner'
 import PriceTag from './PriceTag'
 import QuickAddDialog from './QuickAddDialog'
@@ -104,23 +104,35 @@ export default function ProductCard({ product }: { product: ProductWithVariants 
         >
           <Heart size={16} className={saved ? 'fill-sale text-sale' : 'text-gray-600'} />
         </button>
-
-        {!soldOut && (
-          <button
-            onClick={quickAdd}
-            aria-label={`Add ${product.name} to cart`}
-            className="absolute bottom-2 right-2 rounded-full bg-brand p-2.5 text-white shadow-md hover:bg-brand-light"
-          >
-            <ShoppingBag size={16} />
-          </button>
-        )}
       </div>
 
-      <Link to={href} className="mt-2 block space-y-0.5">
-        <h3 className="truncate text-sm font-medium text-gray-800">{product.name}</h3>
-        <PriceTag price={product.price} compareAt={product.compare_at_price} />
-        {lowStock && <p className="text-xs font-medium text-amber-600">Only 1 left</p>}
-      </Link>
+      <div className="mt-2 space-y-0.5">
+        <Link to={href} className="block">
+          <h3 className="truncate text-sm font-medium text-gray-800">{product.name}</h3>
+        </Link>
+
+        {/* Price on the left, add-to-cart on the same line on the right */}
+        <div className="flex items-center justify-between gap-2">
+          <Link to={href} className="min-w-0">
+            <PriceTag price={product.price} compareAt={product.compare_at_price} />
+          </Link>
+          {!soldOut && (
+            <button
+              onClick={quickAdd}
+              aria-label={`Add ${product.name} to cart`}
+              className="shrink-0 rounded-full bg-brand p-2 text-white shadow-sm hover:bg-brand-light"
+            >
+              <ShoppingCart size={16} />
+            </button>
+          )}
+        </div>
+
+        {lowStock && (
+          <Link to={href} className="block text-xs font-medium text-amber-600">
+            Only 1 left
+          </Link>
+        )}
+      </div>
 
       {pickerOpen && inStock.length > 0 && (
         <QuickAddDialog product={product} variants={inStock} onClose={() => setPickerOpen(false)} />

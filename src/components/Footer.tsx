@@ -1,22 +1,59 @@
-import type { ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Clock, Mail, MapPin, MessageCircle, Phone } from 'lucide-react'
+import { ChevronDown, Clock, Mail, MapPin, MessageCircle, Phone } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { STORE_NAME } from '../config'
 import { PAGE_WIDTH } from '../lib/layout'
 import { whatsappLink } from '../lib/whatsapp'
 import { useAppSettings } from '../hooks/useAppSettings'
 import { FacebookIcon, InstagramIcon, TikTokIcon } from './SocialIcons'
+import Logo from '../components/Logo'
 import type { Category } from '../lib/types'
 
-const linkClass = 'text-sm text-gray-600 hover:text-brand hover:underline'
+const linkClass = 'text-sm text-gray-300 hover:text-white hover:underline'
 
+// On a phone only the heading shows; tapping it slides the links open. From the "sm" breakpoint up
+// the heading is a plain title and the links are always visible.
 function Column({ title, children }: { title: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const panelId = useId()
+
   return (
-    <nav aria-label={title}>
-      <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-900">{title}</h3>
-      <ul className="space-y-2.5">{children}</ul>
+    <nav aria-label={title} className="border-t border-white/10 last:border-b sm:border-0 sm:last:border-0">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-white">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-controls={panelId}
+          className="flex w-full items-center justify-between py-4 text-left uppercase tracking-wide sm:pointer-events-none sm:cursor-default sm:py-0 sm:pb-4"
+        >
+          {title}
+          <ChevronDown
+            size={18}
+            aria-hidden="true"
+            className={`text-gray-300 transition-transform duration-300 motion-reduce:transition-none sm:hidden ${
+              open ? 'rotate-180' : ''
+            }`}
+          />
+        </button>
+      </h3>
+      <div
+        id={panelId}
+        className={`grid transition-[grid-template-rows] duration-300 ease-in-out motion-reduce:transition-none sm:grid-rows-[1fr] ${
+          open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        }`}
+      >
+        {/* "invisible" keeps links out of the tab order while collapsed on a phone */}
+        <div
+          className={`overflow-hidden transition-[visibility] duration-300 motion-reduce:transition-none sm:visible ${
+            open ? 'visible' : 'invisible'
+          }`}
+        >
+          <ul className="space-y-2.5 pb-4 sm:pb-0">{children}</ul>
+        </div>
+      </div>
     </nav>
   )
 }
@@ -50,24 +87,24 @@ export default function Footer() {
   ].filter((x) => x.value?.trim())
 
   return (
-    <footer className="mt-16 border-t border-gray-200 bg-gray-50">
-      <div className={`${PAGE_WIDTH} grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-5`}>
+    <footer className="mt-16 bg-brand text-gray-300">
+      <div className={`${PAGE_WIDTH} grid gap-y-0 py-10 sm:grid-cols-2 sm:gap-10 sm:py-12 lg:grid-cols-5`}>
         {/* Brand and contact */}
-        <div className="sm:col-span-2">
-          <Link to="/" className="text-xl font-bold tracking-tight text-brand">
-            {STORE_NAME}
+        <div className="pb-8 sm:col-span-2 sm:pb-0">
+          <Link to="/" aria-label="Home" className="inline-block">
+            <Logo />
           </Link>
-          <p className="mt-3 max-w-sm text-sm text-gray-600">
+          <p className="mt-3 max-w-sm text-sm text-gray-300">
             Affordable, pre-loved fashion picked for campus life. Delivered to your campus or your door.
           </p>
 
           {contactLines.length > 0 && (
-            <ul className="mt-5 space-y-2 text-sm text-gray-600">
+            <ul className="mt-5 space-y-2 text-sm text-gray-300">
               {contactLines.map(({ value, Icon, href }) => (
                 <li key={value} className="flex items-start gap-2.5">
                   <Icon size={16} className="mt-0.5 shrink-0 text-gray-400" />
                   {href ? (
-                    <a href={href} className="hover:text-brand hover:underline">
+                    <a href={href} className="hover:text-white hover:underline">
                       {value}
                     </a>
                   ) : (
@@ -96,7 +133,7 @@ export default function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={`${STORE_NAME} on ${label}`}
-                  className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-300 text-gray-600 transition-colors hover:border-brand hover:bg-brand hover:text-white"
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 text-gray-300 transition-colors hover:border-white hover:bg-white hover:text-brand"
                 >
                   <Icon />
                 </a>
@@ -167,8 +204,8 @@ export default function Footer() {
         </Column>
       </div>
 
-      <div className="border-t border-gray-200">
-        <div className={`${PAGE_WIDTH} flex flex-col items-center justify-between gap-2 py-5 text-xs text-gray-500 sm:flex-row`}>
+      <div className="border-t border-white/10">
+        <div className={`${PAGE_WIDTH} flex flex-col items-center justify-between gap-2 py-5 text-xs text-gray-400 sm:flex-row`}>
           <p>
             © {new Date().getFullYear()} {STORE_NAME}. All rights reserved.
           </p>

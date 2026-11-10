@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext'
 import HeaderSearch from './HeaderSearch'
 import Footer from './Footer'
 import ReviewPromptBanner from '../components/ReviewPromptBanner'
+import SupportChat from './SupportChat'
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `text-sm font-medium transition-colors ${
@@ -86,6 +87,7 @@ export default function Layout() {
       </main>
 
       <ReviewPromptBanner />
+      <SupportChat />
       <Footer />
     </div>
   )

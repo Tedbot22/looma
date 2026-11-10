@@ -11,7 +11,7 @@ export default function PriceTag({ price, compareAt, size = 'sm' }: Props) {
   const onSale = discountPercent(price, compareAt) !== null
 
   return (
-    <div className="flex items-baseline gap-2">
+    <div className="flex flex-wrap items-baseline gap-x-2">
       <span
         className={`font-semibold ${size === 'lg' ? 'text-2xl' : 'text-base'} ${
           onSale ? 'text-sale' : 'text-gray-900'
