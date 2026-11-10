@@ -55,7 +55,6 @@ export default function ProductDetails({ product }: { product: ProductWithVarian
         </dl>
       </div>
 
-      <p className="mt-4 text-xs text-gray-400">Mention the item ID if you contact us about this product.</p>
     </section>
   )
 }

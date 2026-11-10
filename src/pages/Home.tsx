@@ -96,7 +96,7 @@ export default function Home() {
       </section>
 
       {recent.hasAny && (recent.isLoading || recent.products.length > 0) && (
-        <Section title="Recently viewed" subtitle="Pick up where you left off" to="/recently-viewed">
+        <Section title="Recently viewed" subtitle="" to="/recently-viewed">
           {recent.isLoading ? (
             <ProductGridSkeleton count={4} />
           ) : (
@@ -109,7 +109,7 @@ export default function Home() {
         </Section>
       )}
 
-      <Section title="Recommended for you" subtitle="Picked from what you've been looking at" to="/recommended">
+      <Section title="Recommended for you" subtitle="" to="/recommended">
         {recommended.isLoading ? (
           <ProductGridSkeleton count={4} />
         ) : recommended.items.length === 0 ? (

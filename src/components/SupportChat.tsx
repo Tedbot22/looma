@@ -14,7 +14,7 @@ import {
   type SupportSnapshot,
 } from '../lib/support'
 
-const GREETING = `Hi! I'm ${STORE_NAME}'s virtual assistant. I can check an order for you or answer questions about delivery and the store. For anything else I'll bring in the owner.`
+const GREETING = `Hi! I'm ${STORE_NAME}'s virtual assistant. I can check an order for you or answer questions about delivery and the store. For anything else I'll bring in an Agent.`
 
 // A floating "Chat with us" button for logged-in customers. The AI answers; "Talk to the owner"
 // (or the AI itself, when it can't help) hands the chat to the owner, who replies on WhatsApp.
@@ -113,7 +113,7 @@ export default function SupportChat() {
       {escalated && (
         <p className="flex items-start gap-2 border-t border-amber-100 bg-amber-50 px-4 py-2 text-xs text-amber-800">
           <HeartHandshake size={16} className="mt-0.5 shrink-0" />
-          The owner has been notified and will contact you on WhatsApp. Anything you add here goes to them too.
+          An agent has been notified and will contact you on WhatsApp.
         </p>
       )}
 
@@ -124,7 +124,7 @@ export default function SupportChat() {
             disabled={busy}
             className="mb-2 text-xs font-medium text-brand underline disabled:opacity-40"
           >
-            Talk to the owner instead
+            Talk to an agent.
           </button>
         )}
         <div className="flex items-end gap-2">

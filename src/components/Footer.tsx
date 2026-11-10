@@ -95,7 +95,7 @@ export default function Footer() {
             <Logo />
           </Link>
           <p className="mt-3 max-w-sm text-sm text-gray-300">
-            Affordable, pre-loved fashion picked for campus life. Delivered to your campus or your door.
+            Style. Confidence. You.
           </p>
 
           {contactLines.length > 0 && (

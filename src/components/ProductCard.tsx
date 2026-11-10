@@ -54,7 +54,7 @@ export default function ProductCard({ product }: { product: ProductWithVariants 
       const only = inStock[0]
       const inCart = cartItems.find((i) => i.variantId === only.id)?.quantity ?? 0
       if (inCart >= only.stock) {
-        toast.message('You already have all that is available in your cart.')
+        toast.message('Already in your cart.')
         return
       }
       addItem(toCartItem(product, only), 1)

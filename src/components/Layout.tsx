@@ -1,13 +1,14 @@
 import { useEffect } from 'react'
 import { Link, NavLink, Outlet, useSearchParams } from 'react-router-dom'
-import { ShoppingBag, User } from 'lucide-react'
-import { REFERRAL_KEY, STORE_NAME } from '../config'
+import { ShoppingCart, User } from 'lucide-react'
+import { REFERRAL_KEY } from '../config'
 import { PAGE_WIDTH } from '../lib/layout'
 import { useCart } from '../context/CartContext'
 import { useProfile } from '../hooks/useProfile'
 import { useRealtimeStock } from '../hooks/useRealtimeStock'
 import { useAuth } from '../context/AuthContext'
 import HeaderSearch from './HeaderSearch'
+import Logos from './Logo'
 import Footer from './Footer'
 import ReviewPromptBanner from '../components/ReviewPromptBanner'
 import SupportChat from './SupportChat'
@@ -41,14 +42,14 @@ export default function Layout() {
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-30 border-b border-gray-100 bg-white/95 backdrop-blur">
         {/* On a phone the search drops to its own full-width row; on a larger screen it sits in the middle. */}
-        <div className={`${PAGE_WIDTH} flex flex-wrap items-center gap-x-4 gap-y-3 py-3 md:flex-nowrap md:gap-x-8`}>
-          <Link to="/" className="order-1 text-xl font-bold tracking-tight text-brand">
-            {STORE_NAME}
+        <div className={`${PAGE_WIDTH} flex flex-wrap items-center gap-x-4 gap-y-3 py-3 md:grid md:grid-cols-[1fr_minmax(0,36rem)_1fr] md:gap-x-8`}>
+          <Link to="/" aria-label="Home" className="order-1 justify-self-start">
+            <Logos />
           </Link>
 
-          <HeaderSearch className="order-3 w-full md:order-2 md:max-w-xl md:flex-1" />
+          <HeaderSearch className="order-3 w-full min-w-0 md:order-2" />
 
-          <nav className="order-2 ml-auto flex items-center gap-5 md:order-3 md:ml-0 md:gap-6">
+          <nav className="order-2 ml-auto flex items-center gap-5 md:order-3 md:ml-0 md:justify-self-end md:gap-6">
             <NavLink to="/" end className={`${navLinkClass} hidden md:block`}>
               Home
             </NavLink>
@@ -56,7 +57,7 @@ export default function Layout() {
               Shop
             </NavLink>
             <Link to="/cart" aria-label="Cart" className="relative text-brand">
-              <ShoppingBag size={22} />
+              <ShoppingCart size={22} />
               {count > 0 && (
                 <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-sale px-1 text-[10px] font-bold text-white">
                   {count}
