@@ -25,6 +25,7 @@ import RequireAdmin from './components/RequireAdmin'
 import AdminLayout from './pages/admin/AdminLayout'
 import AdminOrders from './pages/admin/AdminOrders'
 import AdminProducts from './pages/admin/AdminProducts'
+import AdminCategories from './pages/admin/AdminCategories'
 import AdminProductEdit from './pages/admin/AdminProductEdit'
 import ProductForm from './pages/admin/ProductForm'
 import AdminCoupons from './pages/admin/AdminCoupons'
@@ -51,6 +52,7 @@ export default function App() {
         >
           <Route index element={<AdminOrders />} />
           <Route path="products" element={<AdminProducts />} />
+          <Route path="categories" element={<AdminCategories />} />
           <Route path="products/new" element={<ProductForm />} />
           <Route path="products/:productId" element={<AdminProductEdit />} />
           <Route path="delivery" element={<AdminDelivery />} />
