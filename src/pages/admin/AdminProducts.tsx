@@ -234,7 +234,7 @@ export default function AdminProducts() {
               />
               <div className="h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-gray-100">
                 {p.images[0] ? (
-                  <img src={p.images[0]} alt="" className="h-full w-full object-cover" />
+                  <img src={p.images[0]} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full items-center justify-center text-gray-300">
                     <ImageOff size={18} />

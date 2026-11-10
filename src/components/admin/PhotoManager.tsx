@@ -42,7 +42,7 @@ export default function PhotoManager({ images, onChange, max = 6, onBusyChange }
       <div className="flex flex-wrap gap-3">
         {images.map((url, i) => (
           <div key={url} className="relative h-28 w-24 overflow-hidden rounded-lg bg-gray-100">
-            <img src={url} alt="" className="h-full w-full object-cover" />
+            <img src={url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
             {i === 0 ? (
               <span className="absolute bottom-1 left-1 rounded bg-brand px-1.5 py-0.5 text-[10px] font-semibold text-white">
                 Cover

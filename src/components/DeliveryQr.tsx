@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import QRCode from 'qrcode'
 import { CheckCircle2, MessageSquareText, Phone, QrCode, ShieldAlert } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
@@ -91,6 +90,7 @@ export default function DeliveryQr({ orderId }: { orderId: string }) {
         return
       }
       const reply = data as { token: string; expires_in_seconds: number }
+      const { default: QRCode } = await import('qrcode')
       const image = await QRCode.toDataURL(reply.token, { width: 320, margin: 2, errorCorrectionLevel: 'M' })
       setNow(Date.now())
       setShown({ image, expiresAtMs: Date.now() + reply.expires_in_seconds * 1000 })

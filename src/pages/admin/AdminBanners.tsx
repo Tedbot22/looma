@@ -93,7 +93,7 @@ function BannerCard({
   return (
     <li className={`overflow-hidden rounded-xl border bg-white ${banner.is_active ? 'border-gray-200' : 'border-dashed border-gray-300'}`}>
       <div className="relative aspect-[21/9] bg-gray-100">
-        <img src={banner.image_url} alt="" className={`h-full w-full object-cover ${banner.is_active ? '' : 'opacity-50 grayscale'}`} />
+        <img src={banner.image_url} alt="" loading="lazy" decoding="async" className={`h-full w-full object-cover ${banner.is_active ? '' : 'opacity-50 grayscale'}`} />
         {!banner.is_active && (
           <span className="absolute left-3 top-3 rounded-full bg-gray-900 px-3 py-1 text-xs font-semibold text-white">Hidden</span>
         )}

@@ -249,13 +249,17 @@ export default function Checkout() {
       }
     }
 
-    // Remove only what was ordered. Sold-out items stay in the cart, greyed out.
-    removeItems(orderable.map((l) => l.variantId))
-
+    // Online payment: the items STAY in the cart while the customer is on Paystack. They are removed
+    // from the order page once the payment is confirmed (see OrderConfirmation), so a customer who
+    // backs out of Paystack, or whose link fails to load, never loses their cart.
     if (paymentUrl) {
       window.location.href = paymentUrl // hand over to Paystack
       return
     }
+
+    // Pay on delivery or pick-up: the order is final, so remove only what was ordered.
+    // Sold-out items stay in the cart, greyed out.
+    if (method !== 'online') removeItems(orderable.map((l) => l.variantId))
     navigate(`/order/${orderId}`, { replace: true, state: { justOrdered: true } })
   }
 

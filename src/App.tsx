@@ -1,46 +1,58 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import Home from './pages/Home'
-import Shop from './pages/Shop'
-import ProductPage from './pages/ProductPage'
-import Cart from './pages/Cart'
-import Wishlist from './pages/Wishlist'
-import AccountLayout from './pages/account/AccountLayout'
-import AccountHome from './pages/account/AccountHome'
-import AccountOrders from './pages/account/AccountOrders'
-import Vouchers from './pages/account/Vouchers'
-import RecentlyViewed from './pages/account/RecentlyViewed'
-import EditProfile from './pages/account/EditProfile'
-import Invite from './pages/account/Invite'
-import Auth from './pages/Auth'
-import Checkout from './pages/Checkout'
-import OrderConfirmation from './pages/OrderConfirmation'
-import ContentPage from './pages/ContentPage'
-import Contact from './pages/Contact'
-import Recommended from './pages/Recommended'
-import Reviews from './pages/Reviews'
-import SubmitReview from './pages/SubmitReview'
+const Shop = lazy(() => import('./pages/Shop'))
+const ProductPage = lazy(() => import('./pages/ProductPage'))
+const Cart = lazy(() => import('./pages/Cart'))
+const Wishlist = lazy(() => import('./pages/Wishlist'))
+const AccountLayout = lazy(() => import('./pages/account/AccountLayout'))
+const AccountHome = lazy(() => import('./pages/account/AccountHome'))
+const AccountOrders = lazy(() => import('./pages/account/AccountOrders'))
+const Vouchers = lazy(() => import('./pages/account/Vouchers'))
+const RecentlyViewed = lazy(() => import('./pages/account/RecentlyViewed'))
+const EditProfile = lazy(() => import('./pages/account/EditProfile'))
+const Invite = lazy(() => import('./pages/account/Invite'))
+const Auth = lazy(() => import('./pages/Auth'))
+const Checkout = lazy(() => import('./pages/Checkout'))
+const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation'))
+const ContentPage = lazy(() => import('./pages/ContentPage'))
+const Contact = lazy(() => import('./pages/Contact'))
+const Recommended = lazy(() => import('./pages/Recommended'))
+const Reviews = lazy(() => import('./pages/Reviews'))
+const SubmitReview = lazy(() => import('./pages/SubmitReview'))
 import RequireAuth from './components/RequireAuth'
 import RequireAdmin from './components/RequireAdmin'
-import AdminLayout from './pages/admin/AdminLayout'
-import AdminOrders from './pages/admin/AdminOrders'
-import AdminProducts from './pages/admin/AdminProducts'
-import AdminCategories from './pages/admin/AdminCategories'
-import AdminProductEdit from './pages/admin/AdminProductEdit'
-import ProductForm from './pages/admin/ProductForm'
-import AdminCoupons from './pages/admin/AdminCoupons'
-import AdminDelivery from './pages/admin/AdminDelivery'
-import AdminBanners from './pages/admin/AdminBanners'
-import AdminStore from './pages/admin/AdminStore'
-import AdminReviews from './pages/admin/AdminReviews'
-import AdminPaymentIssues from './pages/admin/AdminPaymentIssues'
-import AdminSupport from './pages/admin/AdminSupport'
-import ComingSoon from './pages/ComingSoon'
-import RiderDelivery from './pages/RiderDelivery'
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'))
+const AdminOrders = lazy(() => import('./pages/admin/AdminOrders'))
+const AdminProducts = lazy(() => import('./pages/admin/AdminProducts'))
+const AdminCategories = lazy(() => import('./pages/admin/AdminCategories'))
+const AdminProductEdit = lazy(() => import('./pages/admin/AdminProductEdit'))
+const ProductForm = lazy(() => import('./pages/admin/ProductForm'))
+const AdminCoupons = lazy(() => import('./pages/admin/AdminCoupons'))
+const AdminDelivery = lazy(() => import('./pages/admin/AdminDelivery'))
+const AdminBanners = lazy(() => import('./pages/admin/AdminBanners'))
+const AdminStore = lazy(() => import('./pages/admin/AdminStore'))
+const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'))
+const AdminPaymentIssues = lazy(() => import('./pages/admin/AdminPaymentIssues'))
+const AdminSupport = lazy(() => import('./pages/admin/AdminSupport'))
+const ComingSoon = lazy(() => import('./pages/ComingSoon'))
+const RiderDelivery = lazy(() => import('./pages/RiderDelivery'))
+
+function PageFallback() {
+  return (
+    <div role="status" aria-busy="true" className="flex min-h-[40vh] items-center justify-center">
+      <span className="sr-only">Loading…</span>
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-brand" />
+    </div>
+  )
+}
 
 export default function App() {
   return (
     <BrowserRouter>
+      {/* Each page is its own chunk, downloaded the first time it is visited. */}
+      <Suspense fallback={<PageFallback />}>
       <Routes>
         {/* Admin area: its own layout, only for the owner */}
         <Route
@@ -134,6 +146,7 @@ export default function App() {
           <Route path="*" element={<ComingSoon title="Page not found" />} />
         </Route>
       </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }

@@ -57,6 +57,7 @@ export default function ImageCarousel({ images, alt, children }: Props) {
             src={src}
             alt={`${alt}, photo ${i + 1} of ${images.length}`}
             loading={i === 0 ? 'eager' : 'lazy'}
+            decoding="async"
             className="h-full w-full shrink-0 snap-center object-cover"
           />
         ))}

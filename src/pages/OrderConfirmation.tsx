@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { formatNaira } from '../lib/format'
 import { whatsappLink } from '../lib/whatsapp'
+import { useCart } from '../context/CartContext'
 import { cancelOrder, startPayment, verifyPayment } from '../lib/payments'
 import OrderTimeline from '../components/OrderTimeline'
 import DeliveryQr from '../components/DeliveryQr'
@@ -29,12 +30,16 @@ export default function OrderConfirmation() {
   const [params, setParams] = useSearchParams()
   const [paying, setPaying] = useState(false)
   const verifying = useRef(false)
+  const { removeItems } = useCart()
+  // True only when the customer arrived from Paystack in this visit (the address had ?reference=...).
+  const cameFromPaystack = useRef(false)
   // Stays on screen (a toast disappears in seconds) when we could not confirm a payment.
   const [paymentProblem, setPaymentProblem] = useState<{ reference: string; message: string } | null>(null)
 
   const justOrdered = (location.state as { justOrdered?: boolean } | null)?.justOrdered === true
   // Paystack sends the customer back with ?reference=... (and ?trxref=...).
   const reference = params.get('reference') ?? params.get('trxref')
+  if (reference) cameFromPaystack.current = true
 
   const {
     data: order,
@@ -123,6 +128,17 @@ export default function OrderConfirmation() {
         setParams({}, { replace: true }) // tidy the address bar
       })
   }, [orderId, reference, queryClient, setParams])
+
+  // The cart is only emptied once Paystack payment is confirmed. (Checkout leaves online orders'
+  // items in the cart so nothing is lost if the payment page fails or is abandoned.)
+  const cartCleared = useRef(false)
+  const paidOnline = order?.payment_method === 'online' && order?.payment_status === 'paid'
+  useEffect(() => {
+    if (!order || !paidOnline || !cameFromPaystack.current || cartCleared.current) return
+    cartCleared.current = true
+    const ids = order.order_items.map((i) => i.variant_id).filter((id): id is string => !!id)
+    if (ids.length > 0) removeItems(ids)
+  }, [order, paidOnline, removeItems])
 
   const cancelMutation = useMutation({
     mutationFn: () => cancelOrder(orderId!),

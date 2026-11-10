@@ -78,6 +78,8 @@ export default function Cart() {
                   <img
                     src={line.image}
                     alt={line.name}
+                    loading="lazy"
+                    decoding="async"
                     className={`h-full w-full object-cover ${soldOut ? 'opacity-50 grayscale' : ''}`}
                   />
                 ) : (

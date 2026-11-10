@@ -68,16 +68,7 @@ export default function Home() {
         <HeroSkeleton />
       ) : banners && banners.length > 0 ? (
         <HeroCarousel banners={banners} />
-      ) : (
-        // Until the owner uploads banners, show a simple welcome so the page is never empty.
-        <section className={`-mt-6 mb-10 bg-brand px-6 py-16 text-center text-white sm:py-24 ${FULL_BLEED}`}>
-          <h1 className="text-3xl font-bold sm:text-5xl">Fresh fits. Student prices.</h1>
-          <p className="mx-auto mt-3 max-w-md text-gray-300">Thrift finds and styled outfits, picked for campus life.</p>
-          <Link to="/shop" className="mt-6 inline-block rounded-full bg-white px-7 py-3 text-sm font-semibold text-brand">
-            Shop now
-          </Link>
-        </section>
-      )}
+      ) : ""}
 
       <section>
         <h2 className="mb-4 text-lg font-semibold">Shop by category</h2>
