@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import type { PublicReview, ReviewProduct, ReviewStats } from '../lib/reviews'
+import type { ReviewMedia } from '../lib/reviewMedia'
 
 // Totals for the summary and the product page link. Counted in the database; cached for a few minutes.
 export function useReviewStats() {
@@ -87,6 +88,27 @@ export function useReviewProducts(reviewIds: string[]) {
       if (error) throw error
       const byReview: Record<string, ReviewProduct[]> = {}
       for (const row of (data ?? []) as ReviewProduct[]) (byReview[row.review_id] ??= []).push(row)
+      return byReview
+    },
+  })
+}
+
+// The photos and videos on these reviews, keyed by review id.
+export function useReviewMedia(reviewIds: string[]) {
+  return useQuery({
+    queryKey: ['review-media', reviewIds.join(',')],
+    enabled: reviewIds.length > 0,
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<Record<string, ReviewMedia[]>> => {
+      const { data, error } = await supabase
+        .from('public_review_media')
+        .select('id, review_id, kind, url')
+        .in('review_id', reviewIds)
+        .order('created_at')
+      // The reviews still show if the media view isn't there yet (the SQL has not been run).
+      if (error) return {}
+      const byReview: Record<string, ReviewMedia[]> = {}
+      for (const row of (data ?? []) as ReviewMedia[]) (byReview[row.review_id] ??= []).push(row)
       return byReview
     },
   })

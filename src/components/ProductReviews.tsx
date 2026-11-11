@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { Stars } from './StarRating'
 import ReviewCard from './ReviewCard'
-import { useProductReviews } from '../hooks/useReviews'
+import { useProductReviews, useReviewMedia } from '../hooks/useReviews'
 
 // Reviews from customers who bought this product. Sits on the product page, above the store reviews link.
 // Shows nothing until the product has at least one review.
 export default function ProductReviews({ productId }: { productId: string }) {
   const { data } = useProductReviews(productId)
   const [showAll, setShowAll] = useState(false)
+  const { data: mediaByReview } = useReviewMedia((data?.reviews ?? []).map((r) => r.id))
 
   if (!data || data.count === 0) return null
 
@@ -26,7 +27,7 @@ export default function ProductReviews({ productId }: { productId: string }) {
 
       <div className="mt-4 space-y-3">
         {shown.map((r) => (
-          <ReviewCard key={r.id} review={r} />
+          <ReviewCard key={r.id} review={r} media={mediaByReview?.[r.id]} />
         ))}
       </div>
 

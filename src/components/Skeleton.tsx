@@ -50,6 +50,20 @@ export function ChipsSkeleton({ count = 5 }: { count?: number }) {
   )
 }
 
+// The compact category row on the home page (sits above the banner).
+export function CategoryRowSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <Busy
+      label="Loading categories"
+      className={`no-scrollbar -mt-2 mb-4 flex gap-2 overflow-x-auto px-4 sm:px-6 lg:px-10 ${FULL_BLEED}`}
+    >
+      {Array.from({ length: count }, (_, i) => (
+        <Skeleton key={i} className="h-8 w-20 shrink-0 rounded-full" />
+      ))}
+    </Busy>
+  )
+}
+
 // A vertical list of rows, optionally with a thumbnail (orders, products, vouchers).
 export function ListSkeleton({ rows = 4, withImage = false }: { rows?: number; withImage?: boolean }) {
   return (
@@ -161,7 +175,7 @@ export function OrderSkeleton() {
 // The home page banner while it loads.
 export function HeroSkeleton() {
   return (
-    <Busy label="Loading" className={`-mt-6 mb-10 ${FULL_BLEED}`}>
+    <Busy label="Loading" className={`mb-10 ${FULL_BLEED}`}>
       <Skeleton className="aspect-[16/9] max-h-[620px] w-full rounded-none sm:aspect-[21/9]" />
     </Busy>
   )

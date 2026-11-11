@@ -2,9 +2,19 @@ import { Link } from 'react-router-dom'
 import { BadgeCheck } from 'lucide-react'
 import { Stars } from '../components/StarRating'
 import { REVIEW_QUESTIONS, optionLabel, type PublicReview, type ReviewProduct } from '../lib/reviews'
+import type { ReviewMedia } from '../lib/reviewMedia'
+import ReviewMediaGallery from './ReviewMediaGallery'
 
 // One customer review: stars, who and when, what they said about the quick questions, and their message.
-export default function ReviewCard({ review, products }: { review: PublicReview; products?: ReviewProduct[] }) {
+export default function ReviewCard({
+  review,
+  products,
+  media,
+}: {
+  review: PublicReview
+  products?: ReviewProduct[]
+  media?: ReviewMedia[]
+}) {
   const answers = REVIEW_QUESTIONS.flatMap((q) => {
     const label = optionLabel(q.key, review[q.key])
     return label ? [{ key: q.key, short: q.short, label }] : []
@@ -41,6 +51,8 @@ export default function ReviewCard({ review, products }: { review: PublicReview;
       )}
 
       {review.message && <p className="mt-3 whitespace-pre-line break-words text-sm leading-relaxed text-gray-700">{review.message}</p>}
+
+      {media && media.length > 0 && <ReviewMediaGallery media={media} />}
 
       {answers.length > 0 && (
         <ul className="mt-4 flex flex-wrap gap-2">

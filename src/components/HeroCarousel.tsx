@@ -49,7 +49,7 @@ export default function HeroCarousel({ banners }: { banners: Banner[] }) {
     <section
       aria-roledescription="carousel"
       aria-label="Featured"
-      className={`relative -mt-6 mb-10 overflow-hidden bg-gray-100 ${FULL_BLEED}`}
+      className={`relative mb-10 overflow-hidden bg-gray-100 ${FULL_BLEED}`}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}

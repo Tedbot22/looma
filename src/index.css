@@ -23,3 +23,12 @@ body {
   @apply bg-white text-gray-900 antialiased;
   font-synthesis: none;
 }
+
+/* Hides the scrollbar but keeps scrolling (used by the category row). */
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

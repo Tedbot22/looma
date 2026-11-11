@@ -24,6 +24,8 @@ const SubmitReview = lazy(() => import('./pages/SubmitReview'))
 import RequireAuth from './components/RequireAuth'
 import RequireAdmin from './components/RequireAdmin'
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'))
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
+const AdminCustomers = lazy(() => import('./pages/admin/AdminCustomers'))
 const AdminOrders = lazy(() => import('./pages/admin/AdminOrders'))
 const AdminProducts = lazy(() => import('./pages/admin/AdminProducts'))
 const AdminCategories = lazy(() => import('./pages/admin/AdminCategories'))
@@ -31,7 +33,7 @@ const AdminProductEdit = lazy(() => import('./pages/admin/AdminProductEdit'))
 const ProductForm = lazy(() => import('./pages/admin/ProductForm'))
 const AdminCoupons = lazy(() => import('./pages/admin/AdminCoupons'))
 const AdminDelivery = lazy(() => import('./pages/admin/AdminDelivery'))
-const AdminBanners = lazy(() => import('./pages/admin/AdminBanners'))
+const AdminBanners = lazy(() => import('./pages/admin/AdminReviews'))
 const AdminStore = lazy(() => import('./pages/admin/AdminStore'))
 const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'))
 const AdminPaymentIssues = lazy(() => import('./pages/admin/AdminPaymentIssues'))
@@ -67,7 +69,9 @@ export default function App() {
             </RequireAdmin>
           }
         >
-          <Route index element={<AdminOrders />} />
+          <Route index element={<AdminDashboard />} />
+          <Route path="orders" element={<AdminOrders />} />
+          <Route path="customers" element={<AdminCustomers />} />
           <Route path="products" element={<AdminProducts />} />
           <Route path="categories" element={<AdminCategories />} />
           <Route path="products/new" element={<ProductForm />} />

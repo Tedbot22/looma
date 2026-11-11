@@ -7,6 +7,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useOrderReview } from '../hooks/useReviews'
 import { StarPicker } from '../components/StarRating'
+import ReviewMediaPicker from '../components/ReviewMediaPicker'
+import { removeUploaded, uploadReviewMedia, type PendingMedia } from '../lib/reviewMedia'
 import { OrderSkeleton } from '../components/Skeleton'
 import { MAX_MESSAGE_LENGTH, RATING_LABEL, REVIEW_QUESTIONS, type ReviewQuestionKey } from '../lib/reviews'
 
@@ -29,6 +31,8 @@ export default function SubmitReview() {
   const [rating, setRating] = useState(Number.isInteger(startRating) && startRating >= 1 && startRating <= 5 ? startRating : 0)
   const [answers, setAnswers] = useState<Partial<Record<ReviewQuestionKey, string>>>({})
   const [message, setMessage] = useState('')
+  const [media, setMedia] = useState<PendingMedia[]>([])
+  const [progress, setProgress] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
 
@@ -100,31 +104,66 @@ export default function SubmitReview() {
     if (!user || !order || rating < 1) return
     setSubmitting(true)
 
-    const { error } = await supabase.from('store_reviews').insert({
-      order_id: order.id,
-      user_id: user.id,
-      rating,
-      size_fit: answers.size_fit ?? null,
-      comfort: answers.comfort ?? null,
-      item_condition: answers.item_condition ?? null,
-      delivery: answers.delivery ?? null,
-      message: message.trim() || null,
-    })
-    setSubmitting(false)
+    // 1. Upload the photos and video first, so a slow connection never leaves a half-finished review.
+    const uploaded: { kind: 'image' | 'video'; url: string }[] = []
+    try {
+      for (const [i, item] of media.entries()) {
+        setProgress(`Uploading ${i + 1} of ${media.length}…`)
+        uploaded.push({ kind: item.kind, url: await uploadReviewMedia(user.id, item) })
+      }
+    } catch {
+      await removeUploaded(uploaded.map((u) => u.url))
+      setSubmitting(false)
+      setProgress('')
+      toast.error("We couldn't upload your photos or video. Check your connection and try again.")
+      return
+    }
+    setProgress('')
 
-    if (error) {
+    // 2. The review itself.
+    const { data: created, error } = await supabase
+      .from('store_reviews')
+      .insert({
+        order_id: order.id,
+        user_id: user.id,
+        rating,
+        size_fit: answers.size_fit ?? null,
+        comfort: answers.comfort ?? null,
+        item_condition: answers.item_condition ?? null,
+        delivery: answers.delivery ?? null,
+        message: message.trim() || null,
+      })
+      .select('id')
+      .single()
+
+    if (error || !created) {
+      await removeUploaded(uploaded.map((u) => u.url))
+      setSubmitting(false)
       toast.error(
-        error.code === '23505'
+        error?.code === '23505'
           ? "You've already reviewed this order."
-          : error.code === '42501'
+          : error?.code === '42501'
             ? 'Reviews open once your order has been delivered.'
             : "We couldn't send your review. Please try again."
       )
       return
     }
 
+    // 3. Attach the files to the review.
+    if (uploaded.length > 0) {
+      const { error: mediaError } = await supabase
+        .from('review_media')
+        .insert(uploaded.map((u) => ({ review_id: created.id, user_id: user.id, kind: u.kind, url: u.url })))
+      if (mediaError) {
+        await removeUploaded(uploaded.map((u) => u.url))
+        toast.warning("Your review was sent, but your photos or video couldn't be attached.")
+      }
+    }
+    setSubmitting(false)
+    media.forEach((m) => URL.revokeObjectURL(m.preview))
+
     // Refresh everything that shows reviews, so the new one appears and the prompt goes away.
-    for (const key of ['review-stats', 'store-reviews', 'product-reviews', 'review-products', 'my-reviewed-orders', 'my-review', 'admin-reviews']) {
+    for (const key of ['review-stats', 'store-reviews', 'product-reviews', 'review-products', 'my-reviewed-orders', 'my-review', 'admin-reviews', 'review-media']) {
       queryClient.invalidateQueries({ queryKey: [key] })
     }
     setDone(true)
@@ -206,6 +245,8 @@ export default function SubmitReview() {
             </p>
           </section>
 
+          <ReviewMediaPicker items={media} onChange={setMedia} disabled={submitting} />
+
           <div>
             <button
               type="button"
@@ -213,7 +254,7 @@ export default function SubmitReview() {
               disabled={submitting}
               className="w-full rounded-lg bg-brand py-3 font-semibold text-white hover:bg-brand-light disabled:opacity-60"
             >
-              {submitting ? 'Sending…' : `Submit ${RATING_LABEL[rating].toLowerCase()} review`}
+              {submitting ? progress || 'Sending…' : `Submit ${RATING_LABEL[rating].toLowerCase()} review`}
             </button>
             <p className="mt-3 text-center text-xs text-gray-500">
               Your review will show your first name and last initial. Not now?{' '}

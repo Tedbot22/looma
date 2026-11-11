@@ -145,7 +145,7 @@ async function notifyOrder(orderId: string): Promise<Response> {
     title: `New order #${order.order_number} · ${naira(order.total)}`,
     body: `${customer}${order.delivery_zone ? ` · ${order.delivery_zone}` : ''}: ${firstTwo}${more}\nOrder ID: ${shortId}`,
     tag: `order-${order.id}`,
-    url: '/admin',
+    url: '/admin/orders',
   }
 
   const { data: devices } = await supabase.from('device_tokens').select('id, token')
@@ -225,7 +225,7 @@ async function notifyCancelled(orderId: string, refund: string, byCustomer: bool
     title: `Order #${order.order_number} cancelled`,
     body: `${who} ${naira(order.total)}. ${refundLine}`,
     tag: `cancel-${order.id}`,
-    url: '/admin',
+    url: '/admin/orders',
   }
   const { data: devices } = await supabase.from('device_tokens').select('id, token')
   const { sent: pushed } = await pushToDevices(devices ?? [], payload)
@@ -356,7 +356,7 @@ async function sendTest(authHeader: string | null): Promise<Response> {
     title: 'Test notification',
     body: 'Order alerts are working on this device.',
     tag: 'test',
-    url: '/admin',
+    url: '/admin/orders',
   })
   return json({ sent, registered: (devices ?? []).length, errors })
 }

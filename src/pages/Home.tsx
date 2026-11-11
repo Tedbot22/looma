@@ -7,9 +7,10 @@ import { useRecentlyViewedProducts } from '../hooks/useRecentlyViewedProducts'
 import { useRecommendations } from '../hooks/useRecommendations'
 import HeroCarousel, { type Banner } from '../components/HeroCarousel'
 import ProductCard from '../components/ProductCard'
-import { ChipsSkeleton, HeroSkeleton, ProductGridSkeleton } from '../components/Skeleton'
+import { CategoryRowSkeleton, HeroSkeleton, ProductGridSkeleton } from '../components/Skeleton'
 import type { Category } from '../lib/types'
 import { STORE_NAME } from '../config'
+import { FULL_BLEED } from '../lib/layout'
 
 // A titled row of products, with a button to see the full list.
 function Section({ title, subtitle, to, children }: { title: string; subtitle?: string; to: string; children: ReactNode }) {
@@ -59,6 +60,7 @@ export default function Home() {
     staleTime: 5 * 60_000,
   })
 
+  const hasCategories = categoriesLoading || (categories?.length ?? 0) > 0
   const recent = useRecentlyViewedProducts(8)
   const recommended = useRecommendations(8)
 
@@ -66,27 +68,34 @@ export default function Home() {
     <div>
       {/* The page's main heading for search engines. Screen readers get it too. */}
       <h1 className="sr-only">{STORE_NAME}: thrift fashion and clothing in Nigeria</h1>
-      {bannersLoading ? (
-        <HeroSkeleton />
-      ) : banners && banners.length > 0 ? (
-        <HeroCarousel banners={banners} />
-      ) : ""}
+      {/* Category chips: one compact row above the banner. Swipe sideways; the scrollbar is hidden. */}
+      {categoriesLoading ? (
+        <CategoryRowSkeleton />
+      ) : (
+        categories &&
+        categories.length > 0 && (
+          <nav aria-label="Categories" className={`no-scrollbar -mt-2 mb-4 flex gap-2 overflow-x-auto px-4 sm:px-6 lg:px-10 ${FULL_BLEED}`}>
+            {categories.map((c) => (
+              <Link
+                key={c.id}
+                to={`/shop/${c.id}`}
+                className="shrink-0 whitespace-nowrap rounded-full border border-gray-200 px-3.5 py-1.5 text-xs font-medium hover:border-brand hover:text-brand sm:text-sm"
+              >
+                {c.name}
+              </Link>
+            ))}
+          </nav>
+        )
+      )}
 
-      <section>
-        <h2 className="mb-4 text-lg font-semibold">Shop by category</h2>
-        {categoriesLoading && <ChipsSkeleton />}
-        <div className="flex flex-wrap gap-3">
-          {categories?.map((c) => (
-            <Link
-              key={c.id}
-              to={`/shop/${c.id}`}
-              className="rounded-full border border-gray-200 px-5 py-2 text-sm font-medium hover:border-brand hover:text-brand"
-            >
-              {c.name}
-            </Link>
-          ))}
-        </div>
-      </section>
+      {/* With no category row above it, the banner sits flush under the header as before. */}
+      <div className={hasCategories ? '' : '-mt-6'}>
+        {bannersLoading ? (
+          <HeroSkeleton />
+        ) : banners && banners.length > 0 ? (
+          <HeroCarousel banners={banners} />
+        ) : null}
+      </div>
 
       {recent.hasAny && (recent.isLoading || recent.products.length > 0) && (
         <Section title="Recently viewed" subtitle="" to="/recently-viewed">
@@ -102,19 +111,16 @@ export default function Home() {
         </Section>
       )}
 
-      <Section title="Recommended for you" subtitle="" to="/recommended">
-        {recommended.isLoading ? (
-          <ProductGridSkeleton count={4} />
-        ) : recommended.items.length === 0 ? (
-          <p className="text-gray-500">Nothing to recommend right now. Check back soon!</p>
-        ) : (
+      {/* Only shown once the customer's activity has produced at least one genuine pick. */}
+      {!recommended.isLoading && recommended.personalised > 0 && recommended.items.length > 0 && (
+        <Section title="Recommended for you" subtitle="" to="/recommended">
           <div className={rowGrid}>
             {recommended.items.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
           </div>
-        )}
-      </Section>
+        </Section>
+      )}
     </div>
   )
 }

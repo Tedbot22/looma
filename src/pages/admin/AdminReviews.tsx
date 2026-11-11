@@ -6,6 +6,8 @@ import { supabase } from '../../lib/supabase'
 import { Stars } from '../../components/StarRating'
 import { ListSkeleton } from '../../components/Skeleton'
 import { REVIEW_QUESTIONS, optionLabel, type ReviewQuestionKey } from '../../lib/reviews'
+import ReviewMediaGallery from '../../components/ReviewMediaGallery'
+import type { ReviewMedia } from '../../lib/reviewMedia'
 
 interface AdminReview {
   id: string
@@ -19,6 +21,7 @@ interface AdminReview {
   created_at: string
   orders: { order_number: number } | null
   profiles: { full_name: string | null } | null
+  review_media: Pick<ReviewMedia, 'id' | 'kind' | 'url'>[] | null
 }
 
 type Filter = 'all' | 'low' | 'hidden'
@@ -35,7 +38,7 @@ export default function AdminReviews() {
     queryFn: async (): Promise<AdminReview[]> => {
       const { data, error } = await supabase
         .from('store_reviews')
-        .select('*, orders(order_number), profiles(full_name)')
+        .select('*, orders(order_number), profiles(full_name), review_media(id, kind, url)')
         .order('created_at', { ascending: false })
         .limit(200)
       if (error) throw error
@@ -98,7 +101,7 @@ export default function AdminReviews() {
       </div>
 
       {isLoading && <ListSkeleton rows={4} />}
-      {error && <p className="text-red-600">Couldn't load reviews. Has phase8_reviews.sql been run?</p>}
+      {error && <p className="text-red-600">Couldn't load reviews. Have phase8_reviews.sql and phase9_admin_metrics_and_review_media.sql been run?</p>}
       {reviews && list.length === 0 && <p className="py-10 text-center text-gray-400">Nothing here yet.</p>}
 
       <ul className="space-y-3">
@@ -134,6 +137,7 @@ export default function AdminReviews() {
             </div>
 
             {r.message && <p className="mt-3 whitespace-pre-line break-words text-sm text-gray-700">{r.message}</p>}
+            {r.review_media && r.review_media.length > 0 && <ReviewMediaGallery media={r.review_media} />}
 
             <ul className="mt-3 flex flex-wrap gap-2">
               {REVIEW_QUESTIONS.map((q) => {
