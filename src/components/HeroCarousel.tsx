@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { FULL_BLEED } from '../lib/layout'
 
 export interface Banner {
   id: string
@@ -49,7 +48,7 @@ export default function HeroCarousel({ banners }: { banners: Banner[] }) {
     <section
       aria-roledescription="carousel"
       aria-label="Featured"
-      className={`relative mb-10 overflow-hidden bg-gray-100 ${FULL_BLEED}`}
+      className="relative mb-10 overflow-hidden rounded-2xl bg-gray-100"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}

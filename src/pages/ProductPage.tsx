@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Heart, MessageCircle, Minus, Plus } from 'lucide-react'
+import { ArrowLeft, Heart, MessageCircle, Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { discountPercent } from '../lib/format'
@@ -27,11 +27,10 @@ function variantLabel(v: ProductVariant): string {
 export default function ProductPage() {
   const { productId } = useParams()
   const navigate = useNavigate()
-  const { addItem } = useCart()
+  const { items: cartItems, addItem, setQuantity: setCartQuantity, removeItem } = useCart()
   const wishlist = useWishlist()
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [quantity, setQuantity] = useState(1)
 
   const {
     data: product,
@@ -62,7 +61,6 @@ export default function ProductPage() {
   useEffect(() => {
     window.scrollTo({ top: 0 })
     setSelectedId(null)
-    setQuantity(1)
   }, [productId])
 
   // What Google and link previews (WhatsApp, Facebook) show for this item, plus Product data so Google can
@@ -152,16 +150,28 @@ export default function ProductPage() {
     toast.success(saved ? 'Removed from wishlist' : 'Saved to wishlist')
   }
 
+  // How many of the chosen option are already in the cart.
+  const inCart = active ? (cartItems.find((i) => i.variantId === active.id)?.quantity ?? 0) : 0
+
   function handleAddToCart() {
     if (!cartItem) return
-    addItem(cartItem, quantity)
+    addItem(cartItem, 1)
     toast.success('Added to cart')
   }
 
-  function handleBuyNow() {
-    if (!cartItem) return
-    addItem(cartItem, quantity)
-    navigate('/cart') // becomes /checkout in the checkout batch
+  function handleLess() {
+    if (!active) return
+    if (inCart <= 1) removeItem(active.id)
+    else setCartQuantity(active.id, inCart - 1)
+  }
+
+  function handleMore() {
+    if (!active) return
+    if (inCart >= active.stock) {
+      toast.message(`Only ${active.stock} available.`)
+      return
+    }
+    setCartQuantity(active.id, inCart + 1)
   }
 
   const contactMessage =
@@ -213,10 +223,7 @@ export default function ProductPage() {
                     <button
                       key={v.id}
                       disabled={out}
-                      onClick={() => {
-                        setSelectedId(v.id)
-                        setQuantity(1)
-                      }}
+                      onClick={() => setSelectedId(v.id)}
                       className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
                         out
                           ? 'cursor-not-allowed border-gray-100 text-gray-300 line-through'
@@ -238,30 +245,6 @@ export default function ProductPage() {
             </div>
           )}
 
-          {/* Quantity */}
-          {active && active.stock > 1 && (
-            <div className="flex items-center gap-3">
-              <p className="text-sm font-medium">Quantity</p>
-              <div className="flex items-center rounded-lg border border-gray-200">
-                <button
-                  aria-label="Decrease quantity"
-                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  className="p-2 hover:text-brand"
-                >
-                  <Minus size={16} />
-                </button>
-                <span className="w-8 text-center text-sm">{Math.min(quantity, active.stock)}</span>
-                <button
-                  aria-label="Increase quantity"
-                  onClick={() => setQuantity((q) => Math.min(active.stock, q + 1))}
-                  className="p-2 hover:text-brand"
-                >
-                  <Plus size={16} />
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Actions */}
           <div className="space-y-3 pt-2">
             {soldOut ? (
@@ -269,18 +252,47 @@ export default function ProductPage() {
                 Sold out
               </p>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={handleAddToCart}
-                  className="rounded-lg border border-brand py-3 font-semibold text-brand hover:bg-gray-50"
+              /* One row. Not in the cart: the button is full width and says "Add to cart". Once the item is
+                 added, the - N + control slides in on the left and the same button narrows to "Go to cart". */
+              <div className="flex items-stretch">
+                <div
+                  inert={inCart === 0}
+                  aria-hidden={inCart === 0}
+                  className={`overflow-hidden transition-all duration-300 ease-out ${
+                    inCart > 0 ? 'mr-3 max-w-44 opacity-100' : 'mr-0 max-w-0 opacity-0'
+                  }`}
                 >
-                  Add to cart
-                </button>
+                  <div role="group" aria-label="Quantity in cart" className="flex h-full shrink-0 items-center rounded-lg border border-gray-300">
+                    <button
+                      onClick={handleLess}
+                      aria-label={inCart <= 1 ? 'Remove from cart' : 'One less'}
+                      className="p-3.5 text-brand transition-transform hover:bg-brand/10 active:scale-90"
+                    >
+                      {inCart <= 1 ? <Trash2 size={18} /> : <Minus size={18} />}
+                    </button>
+                    <span className="w-8 text-center text-base font-semibold tabular-nums" aria-live="polite">
+                      <span key={inCart} className="count-bump">
+                        {inCart}
+                      </span>
+                    </span>
+                    <button
+                      onClick={handleMore}
+                      aria-label="One more"
+                      disabled={inCart >= active.stock}
+                      className="p-3.5 text-brand transition-transform hover:bg-brand/10 active:scale-90 disabled:opacity-30"
+                    >
+                      <Plus size={18} />
+                    </button>
+                  </div>
+                </div>
+
                 <button
-                  onClick={handleBuyNow}
-                  className="rounded-lg bg-brand py-3 font-semibold text-white hover:bg-brand-light"
+                  onClick={inCart > 0 ? () => navigate('/cart') : handleAddToCart}
+                  className="min-w-0 flex-1 rounded-lg bg-brand py-3.5 font-semibold text-white transition-transform hover:bg-brand-light active:scale-[0.98]"
                 >
-                  Buy now
+                  <span key={inCart > 0 ? 'go' : 'add'} className="pop-in flex items-center justify-center gap-2">
+                    <ShoppingCart size={18} /> {inCart > 0 ? 'Go to cart' : 'Add to cart'}
+                  </span>
                 </button>
               </div>
             )}

@@ -32,3 +32,39 @@ body {
     display: none;
   }
 }
+
+/* Small motion for the cart controls: they ease in when they swap, the count bumps when it changes. */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes count-bump {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.pop-in {
+  animation: pop-in 0.22s ease-out both;
+}
+.count-bump {
+  display: inline-block;
+  animation: count-bump 0.26s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pop-in,
+  .count-bump {
+    animation: none;
+  }
+}

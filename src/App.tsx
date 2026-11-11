@@ -18,6 +18,7 @@ const Checkout = lazy(() => import('./pages/Checkout'))
 const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation'))
 const ContentPage = lazy(() => import('./pages/ContentPage'))
 const Contact = lazy(() => import('./pages/Contact'))
+const DailyDeals = lazy(() => import('./pages/DailyDeals'))
 const Recommended = lazy(() => import('./pages/Recommended'))
 const Reviews = lazy(() => import('./pages/Reviews'))
 const SubmitReview = lazy(() => import('./pages/SubmitReview'))
@@ -33,7 +34,7 @@ const AdminProductEdit = lazy(() => import('./pages/admin/AdminProductEdit'))
 const ProductForm = lazy(() => import('./pages/admin/ProductForm'))
 const AdminCoupons = lazy(() => import('./pages/admin/AdminCoupons'))
 const AdminDelivery = lazy(() => import('./pages/admin/AdminDelivery'))
-const AdminBanners = lazy(() => import('./pages/admin/AdminReviews'))
+const AdminBanners = lazy(() => import('./pages/admin/AdminBanners'))
 const AdminStore = lazy(() => import('./pages/admin/AdminStore'))
 const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'))
 const AdminPaymentIssues = lazy(() => import('./pages/admin/AdminPaymentIssues'))
@@ -103,6 +104,7 @@ export default function App() {
           <Route path="/contact" element={<Contact />} />
 
           {/* The full lists behind the home page's "View all" buttons (open to everyone) */}
+          <Route path="/daily-deals" element={<DailyDeals />} />
           <Route path="/recommended" element={<Recommended />} />
           <Route path="/recently-viewed" element={<RecentlyViewed />} />
 

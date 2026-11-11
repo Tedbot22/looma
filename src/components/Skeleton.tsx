@@ -175,8 +175,8 @@ export function OrderSkeleton() {
 // The home page banner while it loads.
 export function HeroSkeleton() {
   return (
-    <Busy label="Loading" className={`mb-10 ${FULL_BLEED}`}>
-      <Skeleton className="aspect-[16/9] max-h-[620px] w-full rounded-none sm:aspect-[21/9]" />
+    <Busy label="Loading" className="mb-10">
+      <Skeleton className="aspect-[16/9] max-h-[620px] w-full rounded-2xl sm:aspect-[21/9]" />
     </Busy>
   )
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Heart, ImageOff, ShoppingCart } from 'lucide-react'
+import { Heart, ImageOff, Minus, Plus, ShoppingCart } from 'lucide-react'
 import { toast } from 'sonner'
 import PriceTag from './PriceTag'
 import QuickAddDialog from './QuickAddDialog'
@@ -11,7 +11,7 @@ import { toCartItem, variantLabel } from '../lib/variants'
 import type { ProductWithVariants } from '../lib/types'
 
 export default function ProductCard({ product }: { product: ProductWithVariants }) {
-  const { items: cartItems, addItem } = useCart()
+  const { items: cartItems, addItem, setQuantity, removeItem } = useCart()
   const wishlist = useWishlist()
   const [pickerOpen, setPickerOpen] = useState(false)
 
@@ -49,19 +49,33 @@ export default function ProductCard({ product }: { product: ProductWithVariants 
     toast.success('Saved to wishlist')
   }
 
+  // A product with a single option can be added (and its quantity changed) right on the card.
+  // With several options (sizes, colours) the button opens a small picker instead.
+  const single = inStock.length === 1 ? inStock[0] : null
+  const cartQty = single ? (cartItems.find((i) => i.variantId === single.id)?.quantity ?? 0) : 0
+
   function quickAdd() {
-    if (inStock.length === 1) {
-      const only = inStock[0]
-      const inCart = cartItems.find((i) => i.variantId === only.id)?.quantity ?? 0
-      if (inCart >= only.stock) {
-        toast.message('Already in your cart.')
-        return
-      }
-      addItem(toCartItem(product, only), 1)
+    if (single) {
+      addItem(toCartItem(product, single), 1)
       toast.success('Added to cart')
     } else {
-      setPickerOpen(true) // several options: let them choose
+      setPickerOpen(true)
     }
+  }
+
+  function decrease() {
+    if (!single) return
+    if (cartQty <= 1) removeItem(single.id)
+    else setQuantity(single.id, cartQty - 1)
+  }
+
+  function increase() {
+    if (!single) return
+    if (cartQty >= single.stock) {
+      toast.message(`Only ${single.stock} available.`)
+      return
+    }
+    setQuantity(single.id, cartQty + 1)
   }
 
   return (
@@ -112,26 +126,60 @@ export default function ProductCard({ product }: { product: ProductWithVariants 
           <h3 className="truncate text-sm font-medium text-gray-800">{product.name}</h3>
         </Link>
 
-        {/* Price on the left, add-to-cart on the same line on the right */}
-        <div className="flex items-center justify-between gap-2">
-          <Link to={href} className="min-w-0">
-            <PriceTag price={product.price} compareAt={product.compare_at_price} />
-          </Link>
-          {!soldOut && (
-            <button
-              onClick={quickAdd}
-              aria-label={`Add ${product.name} to cart`}
-              className="shrink-0 rounded-full bg-brand p-2 text-white shadow-sm hover:bg-brand-light"
-            >
-              <ShoppingCart size={16} />
-            </button>
-          )}
-        </div>
+        <Link to={href} className="block">
+          <PriceTag price={product.price} compareAt={product.compare_at_price} />
+        </Link>
 
         {lowStock && (
           <Link to={href} className="block text-xs font-medium text-amber-600">
             Only 1 left
           </Link>
+        )}
+
+        {/* Full-width add-to-cart, always visible. Once the item is in the cart it turns into a - 1 + stepper:
+            only the - and + buttons are brand coloured, the count in the middle has no background. */}
+        {!soldOut && (
+          <div className="pt-2">
+            {single && cartQty > 0 ? (
+              <div
+                role="group"
+                aria-label={`${product.name} quantity in cart`}
+                className="pop-in flex items-center justify-between gap-2"
+              >
+                <button
+                  type="button"
+                  onClick={decrease}
+                  aria-label={cartQty <= 1 ? `Remove ${product.name} from cart` : 'One less'}
+                  className="rounded-md bg-brand px-3 py-2.5 text-white transition-transform hover:bg-brand-light active:scale-90"
+                >
+                  <Minus size={16} />
+                </button>
+                <span className="text-sm font-bold tabular-nums text-gray-900" aria-live="polite">
+                  <span key={cartQty} className="count-bump">
+                    {cartQty}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={increase}
+                  aria-label="One more"
+                  disabled={cartQty >= single.stock}
+                  className="rounded-md bg-brand px-3 py-2.5 text-white transition-transform hover:bg-brand-light active:scale-90 disabled:opacity-40"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={quickAdd}
+                aria-label={`Add ${product.name} to cart`}
+                className="pop-in flex w-full items-center justify-center gap-2 rounded-md bg-brand px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white transition-transform hover:bg-brand-light active:scale-[0.97]"
+              >
+                <ShoppingCart size={16} /> Add to cart
+              </button>
+            )}
+          </div>
         )}
       </div>
 

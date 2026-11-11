@@ -1,15 +1,77 @@
 import { useQuery } from '@tanstack/react-query'
+import { useMemo, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { useProductPool } from '../hooks/useRecommendations'
+import { useRecentlyViewedProducts } from '../hooks/useRecentlyViewedProducts'
+import { useProductPool, useRecommendations } from '../hooks/useRecommendations'
 import HeroCarousel, { type Banner } from '../components/HeroCarousel'
 import ProductCard from '../components/ProductCard'
-import { CategoryRowSkeleton, HeroSkeleton, ProductGridSkeleton } from '../components/Skeleton'
-import type { Category } from '../lib/types'
+import { CategoryRowSkeleton, HeroSkeleton, ProductCardSkeleton } from '../components/Skeleton'
+import type { Category, ProductWithVariants } from '../lib/types'
+import { dailyDealsList } from '../lib/dailyDeals'
 import { STORE_NAME } from '../config'
 import { FULL_BLEED } from '../lib/layout'
 
-const rowGrid = 'grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-6 md:grid-cols-4'
+// A titled row of products, with an optional button to see the full list.
+function Section({ title, subtitle, to, children }: { title: string; subtitle?: string; to?: string; children: ReactNode }) {
+  return (
+    <section className="mt-14">
+      <div className="mb-6 flex items-end justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold sm:text-2xl">{title}</h2>
+          {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
+        </div>
+        {to && (
+          <Link
+            to={to}
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-gray-300 px-4 py-2 text-sm font-medium hover:border-brand hover:text-brand"
+          >
+            View all <ArrowRight size={15} />
+          </Link>
+        )}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+const ROW_MAX = 6
+
+// A single row that scrolls sideways (scrollbar hidden), edge to edge on small screens.
+function ProductRow({ children }: { children: ReactNode }) {
+  return (
+    <ul className="no-scrollbar -mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:gap-6 sm:px-6 lg:-mx-10 lg:px-10">
+      {children}
+    </ul>
+  )
+}
+
+const Cell = ({ children }: { children: ReactNode }) => <li className="w-40 shrink-0 snap-start sm:w-52">{children}</li>
+
+function RowSkeleton() {
+  return (
+    <ProductRow>
+      {Array.from({ length: ROW_MAX }, (_, i) => (
+        <Cell key={i}>
+          <ProductCardSkeleton />
+        </Cell>
+      ))}
+    </ProductRow>
+  )
+}
+
+function Products({ items }: { items: ProductWithVariants[] }) {
+  return (
+    <ProductRow>
+      {items.map((p) => (
+        <Cell key={p.id}>
+          <ProductCard product={p} />
+        </Cell>
+      ))}
+    </ProductRow>
+  )
+}
 
 export default function Home() {
   const { data: categories, isLoading: categoriesLoading } = useQuery({
@@ -36,10 +98,17 @@ export default function Home() {
     staleTime: 5 * 60_000,
   })
 
-  const hasCategories = categoriesLoading || (categories?.length ?? 0) > 0
   const pool = useProductPool()
-  // The shop shows the store's whole inventory, newest first.
-  const shopItems = pool.data ?? []
+  const recent = useRecentlyViewedProducts(ROW_MAX)
+  const recommended = useRecommendations(ROW_MAX * 2)
+
+  // Daily deals: the freshest items (and markdowns) first. Always the top row.
+  const deals = useMemo(() => (pool.data ? dailyDealsList(pool.data).slice(0, ROW_MAX) : []), [pool.data])
+  const dealIds = new Set(deals.map((p) => p.id))
+
+  // Recommended for you: personal picks once the customer has interacted with items, random items before
+  // that (the algorithm fills with random items when it has nothing to go on). No repeats of the deals above.
+  const picks = recommended.items.filter((p) => !dealIds.has(p.id)).slice(0, ROW_MAX)
 
   return (
     <div>
@@ -65,29 +134,31 @@ export default function Home() {
         )
       )}
 
-      {/* With no category row above it, the banner sits flush under the header as before. */}
-      <div className={hasCategories ? '' : '-mt-6'}>
-        {bannersLoading ? (
-          <HeroSkeleton />
-        ) : banners && banners.length > 0 ? (
-          <HeroCarousel banners={banners} />
-        ) : null}
-      </div>
+      {bannersLoading ? <HeroSkeleton /> : banners && banners.length > 0 ? <HeroCarousel banners={banners} /> : null}
 
-      {/* The shop: the store's whole inventory, newest first. */}
-      <section className="mt-10">
-        {pool.isLoading ? (
-          <ProductGridSkeleton count={8} />
-        ) : shopItems.length === 0 ? (
-          <p className="text-gray-500">Nothing in the shop right now. Check back soon!</p>
+      {/* Daily deals always sit above Recently viewed and Recommended. */}
+      {(pool.isLoading || deals.length > 0) && (
+        <Section title="Daily deals" subtitle="Fresh arrivals and a daily mix of finds" to="/daily-deals">
+          {pool.isLoading ? <RowSkeleton /> : <Products items={deals} />}
+        </Section>
+      )}
+
+      {/* Only when the customer has actually viewed something. */}
+      {recent.hasAny && (recent.isLoading || recent.products.length > 0) && (
+        <Section title="Recently viewed" to="/recently-viewed">
+          {recent.isLoading ? <RowSkeleton /> : <Products items={recent.products.slice(0, ROW_MAX)} />}
+        </Section>
+      )}
+
+      <Section title="Recommended for you" to="/recommended">
+        {recommended.isLoading ? (
+          <RowSkeleton />
+        ) : picks.length === 0 ? (
+          <p className="text-gray-500">Nothing to recommend right now. Check back soon!</p>
         ) : (
-          <div className={rowGrid}>
-            {shopItems.map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
+          <Products items={picks} />
         )}
-      </section>
+      </Section>
     </div>
   )
 }
