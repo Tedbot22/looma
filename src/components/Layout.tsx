@@ -18,16 +18,20 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   }`
 // Pages where the footer is just noise: sign-in, checkout/order steps, the account area and 404.
 // To hide it somewhere else, add the path start here. To bring it back, remove it.
-const NO_FOOTER_PREFIXES = ['/login', '/signup', '/checkout', '/order/', '/review/', '/account']
-const KNOWN_FOOTER_PAGES = ['/', '/shop', '/product', '/cart', '/about', '/faq', '/privacy', '/terms', '/contact', '/recommended', '/recently-viewed', '/reviews', '/wishlist']
+   // "Focused" pages: sign-in, checkout/order steps, review submission and the account area.
+   // They hide the footer and the header search so people stay on the task.
+   // To hide them somewhere else, add the path start here. To bring them back, remove it.
+   const FOCUSED_PREFIXES = ['/login', '/signup', '/checkout', '/order', '/review', '/account']
+   const FOOTER_PAGES = ['/', '/shop', '/product', '/cart', '/about', '/faq', '/privacy', '/terms', '/contact', '/recommended', '/recently-viewed', '/reviews', '/wishlist']
 
-function shouldShowFooter(pathname: string) {
-  if (NO_FOOTER_PREFIXES.some((p) => pathname === p || pathname.startsWith(p.endsWith('/') ? p : p + '/') || pathname === p.replace(/\/$/, ''))) {
-    return false
-  }
-  // Unknown paths land on the "Page not found" screen, which doesn't need a footer either.
-  return KNOWN_FOOTER_PAGES.some((p) => (p === '/' ? pathname === '/' : pathname === p || pathname.startsWith(p + '/')))
-}
+   const matches = (pathname: string, base: string) =>
+     base === '/' ? pathname === '/' : pathname === base || pathname.startsWith(base + '/')
+
+   const isFocusedPage = (pathname: string) => FOCUSED_PREFIXES.some((p) => matches(pathname, p))
+
+   // Footer only on known public pages (so the "Page not found" screen doesn't get one).
+   const shouldShowFooter = (pathname: string) =>
+     !isFocusedPage(pathname) && FOOTER_PAGES.some((p) => matches(pathname, p))
 
 export default function Layout() {
   const { count } = useCart()
@@ -37,6 +41,7 @@ export default function Layout() {
   const [params] = useSearchParams()
   const { pathname } = useLocation()
   const showFooter = shouldShowFooter(pathname)
+  const showSearch = !isFocusedPage(pathname)
 
 
   // Invite links look like https://yourstore.com/?ref=AB12CD34.
@@ -61,7 +66,7 @@ export default function Layout() {
             <Logos />
           </Link>
 
-          <HeaderSearch className="order-3 w-full min-w-0 md:order-2" />
+            {showSearch && <HeaderSearch className="order-3 w-full min-w-0 md:order-2" />}
 
           <nav className="order-2 ml-auto flex items-center gap-5 md:order-3 md:ml-0 md:justify-self-end md:gap-6">
             <NavLink to="/" end className={`${navLinkClass} hidden md:block`}>

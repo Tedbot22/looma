@@ -38,6 +38,7 @@ const AdminPaymentIssues = lazy(() => import('./pages/admin/AdminPaymentIssues')
 const AdminSupport = lazy(() => import('./pages/admin/AdminSupport'))
 const ComingSoon = lazy(() => import('./pages/ComingSoon'))
 const RiderDelivery = lazy(() => import('./pages/RiderDelivery'))
+import ScrollToTop from './components/ScrollToTop'
 
 function PageFallback() {
   return (
@@ -51,6 +52,7 @@ function PageFallback() {
 export default function App() {
   return (
     <BrowserRouter>
+    <ScrollToTop />
       {/* Each page is its own chunk, downloaded the first time it is visited. */}
       <Suspense fallback={<PageFallback />}>
       <Routes>
