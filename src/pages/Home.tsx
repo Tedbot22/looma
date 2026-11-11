@@ -8,7 +8,6 @@ import { useRecommendations } from '../hooks/useRecommendations'
 import HeroCarousel, { type Banner } from '../components/HeroCarousel'
 import ProductCard from '../components/ProductCard'
 import { ChipsSkeleton, HeroSkeleton, ProductGridSkeleton } from '../components/Skeleton'
-import { FULL_BLEED } from '../lib/layout'
 import type { Category } from '../lib/types'
 
 // A titled row of products, with a button to see the full list.
