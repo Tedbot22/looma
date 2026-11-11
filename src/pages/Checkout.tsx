@@ -43,6 +43,9 @@ export default function Checkout() {
   const [codeInput, setCodeInput] = useState('')
   const [codeMessage, setCodeMessage] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // True while we hand the customer over to Paystack. Placing the order reserves stock, which makes the
+  // cart look empty for a moment, so we show a "redirecting" screen instead of the empty-cart message.
+  const [redirecting, setRedirecting] = useState(false)
 
   const phone = phoneInput ?? profile?.phone ?? ''
   const soldOutCount = lines.length - orderable.length
@@ -108,6 +111,15 @@ export default function Checkout() {
 
   if (loading || addressesLoading || zonesLoading) {
     return <CheckoutSkeleton />
+  }
+
+  if (redirecting) {
+    return (
+      <div className="py-20 text-center text-gray-500">
+        <p>Taking you to Paystack…</p>
+        <p className="mt-1 text-xs text-gray-400">Please don't close this page.</p>
+      </div>
+    )
   }
 
   if (orderable.length === 0) {
@@ -242,6 +254,7 @@ export default function Checkout() {
     // (If this fails the order still exists; the order page has a "Pay now" button to retry.)
     let paymentUrl: string | null = null
     if (method === 'online') {
+      setRedirecting(true)
       try {
         paymentUrl = await startPayment(orderId as string)
       } catch (err) {
@@ -256,6 +269,7 @@ export default function Checkout() {
       window.location.href = paymentUrl // hand over to Paystack
       return
     }
+    setRedirecting(false) // payment could not be started: carry on to the order page
 
     // Pay on delivery or pick-up: the order is final, so remove only what was ordered.
     // Sold-out items stay in the cart, greyed out.

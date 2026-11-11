@@ -39,7 +39,12 @@ Deno.serve(async (req) => {
 
   // Each attempt needs a unique reference (letters, numbers and dashes only).
   const reference = `ord-${order.id}-${Date.now()}`
-  const siteUrl = Deno.env.get('SITE_URL') ?? ''
+  // Where Paystack sends the customer back to. Set with:  npx supabase secrets set SITE_URL=https://your-domain.com
+  const siteUrl = (Deno.env.get('SITE_URL') ?? '').replace(/\/+$/, '')
+  if (!siteUrl) {
+    console.error('SITE_URL secret is not set')
+    return json({ error: 'Payments are not configured yet. Please contact support.' }, 500)
+  }
 
   const { ok, body } = await paystack('/transaction/initialize', {
     method: 'POST',

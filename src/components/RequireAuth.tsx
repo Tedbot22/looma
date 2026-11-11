@@ -13,7 +13,8 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
   if (loading) return <p className="py-20 text-center text-gray-400">Loading…</p>
 
   if (!user) {
-    return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />
+    // Keep the ?query too, so coming back from Paystack (/order/:id?reference=...) still verifies the payment after login.
+    return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} replace />
   }
 
   return <>{children}</>
