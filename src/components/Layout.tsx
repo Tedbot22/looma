@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Link, NavLink, Outlet, useSearchParams } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useSearchParams } from 'react-router-dom'
 import { ShoppingCart, User } from 'lucide-react'
 import { REFERRAL_KEY } from '../config'
 import { PAGE_WIDTH } from '../lib/layout'
@@ -14,9 +14,20 @@ import ReviewPromptBanner from '../components/ReviewPromptBanner'
 import SupportChat from './SupportChat'
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `text-sm font-medium transition-colors ${
-    isActive ? 'text-brand' : 'text-gray-500 hover:text-brand'
+  `text-sm font-medium transition-colors ${isActive ? 'text-brand' : 'text-gray-500 hover:text-brand'
   }`
+// Pages where the footer is just noise: sign-in, checkout/order steps, the account area and 404.
+// To hide it somewhere else, add the path start here. To bring it back, remove it.
+const NO_FOOTER_PREFIXES = ['/login', '/signup', '/checkout', '/order/', '/review/', '/account']
+const KNOWN_FOOTER_PAGES = ['/', '/shop', '/product', '/cart', '/about', '/faq', '/privacy', '/terms', '/contact', '/recommended', '/recently-viewed', '/reviews', '/wishlist']
+
+function shouldShowFooter(pathname: string) {
+  if (NO_FOOTER_PREFIXES.some((p) => pathname === p || pathname.startsWith(p.endsWith('/') ? p : p + '/') || pathname === p.replace(/\/$/, ''))) {
+    return false
+  }
+  // Unknown paths land on the "Page not found" screen, which doesn't need a footer either.
+  return KNOWN_FOOTER_PAGES.some((p) => (p === '/' ? pathname === '/' : pathname === p || pathname.startsWith(p + '/')))
+}
 
 export default function Layout() {
   const { count } = useCart()
@@ -24,6 +35,9 @@ export default function Layout() {
   useRealtimeStock() // items flip to "Sold out" live, without a refresh
   const { user } = useAuth()
   const [params] = useSearchParams()
+  const { pathname } = useLocation()
+  const showFooter = shouldShowFooter(pathname)
+
 
   // Invite links look like https://yourstore.com/?ref=AB12CD34.
   // Remember the code so it can pre-fill the signup form, even if they browse first.
@@ -89,7 +103,7 @@ export default function Layout() {
 
       <ReviewPromptBanner />
       <SupportChat />
-      <Footer />
+      {showFooter && <Footer />}
     </div>
   )
 }

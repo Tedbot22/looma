@@ -32,9 +32,9 @@ export default function AddressBook() {
 
   return (
     <section className="mt-10">
-      <h2 className="mb-1 text-lg font-semibold">Home delivery addresses</h2>
+      <h2 className="mb-1 text-lg font-semibold">Address Book</h2>
       <p className="mb-4 text-sm text-gray-500">
-        Save your address once and pick it in one tap at checkout.
+       Your default shipping address.
       </p>
 
       {isLoading && <p className="text-sm text-gray-400">Loading…</p>}

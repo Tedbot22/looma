@@ -69,13 +69,11 @@ export default function EditProfile() {
             onChange={(e) => setPhoneInput(e.target.value)}
             required
           />
-          <p className="mt-1 text-xs text-gray-400">We use this to reach you about deliveries.</p>
         </div>
 
         <div>
           <label className="mb-1 block text-sm font-medium">Email</label>
           <input className={`${inputClass} bg-gray-50 text-gray-500`} value={user.email ?? ''} disabled />
-          <p className="mt-1 text-xs text-gray-400">Your email is used to log in and can't be changed here.</p>
         </div>
 
         <button
