@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { FunctionsHttpError } from '@supabase/supabase-js'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
@@ -99,26 +98,5 @@ export function useCustomerPush() {
     }
   }
 
-  async function sendTest() {
-    setBusy(true)
-    try {
-      const { data, error } = await supabase.functions.invoke('notify-customer', { body: { test: true } })
-      if (error) {
-        if (error instanceof FunctionsHttpError) {
-          const body = await error.context.text().catch(() => '')
-          throw new Error(`${error.context.status}: ${body || 'no details'}`)
-        }
-        throw error
-      }
-      if (data?.registered === 0) toast.error('This device is not registered. Turn updates off and on again.')
-      else if (data?.errors?.length) toast.error(`The push service rejected it: ${data.errors.join(' | ')}`)
-      else toast.success('Test sent. It should appear in a few seconds.')
-    } catch (err) {
-      toast.error(`Test failed: ${(err as Error).message}`)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return { state, busy, enable, disable, sendTest }
+  return { state, busy, enable, disable }
 }

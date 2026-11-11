@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { ChevronRight, Clock, Gift, Heart, LogOut, Package, Ticket, User } from 'lucide-react'
+import { ChevronRight, CircleHelp, Clock, FileText, Gift, Headset, Heart, Info, LogOut, Package, ShieldCheck, Ticket, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useWishlist } from '../../context/WishlistContext'
@@ -14,6 +14,34 @@ interface MenuItem {
   label: string
   hint: string
   icon: LucideIcon
+}
+
+function MenuList({ items }: { items: MenuItem[] }) {
+  return (
+    <ul className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200">
+      {items.map(({ to, label, hint, icon: Icon }) => (
+        <li key={to}>
+          <Link to={to} className="flex items-center gap-4 px-4 py-4 hover:bg-gray-50">
+            <Icon size={20} className="shrink-0 text-gray-500" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">{label}</p>
+              <p className="truncate text-xs text-gray-500">{hint}</p>
+            </div>
+            <ChevronRight size={18} className="shrink-0 text-gray-300" />
+          </Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-6">
+      <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</h2>
+      {children}
+    </section>
+  )
 }
 
 export default function AccountHome() {
@@ -40,6 +68,17 @@ export default function AccountHome() {
     { to: '/account/profile', label: 'Edit profile', hint: 'Name, phone and delivery locations', icon: User },
   ]
 
+  const customerCare: MenuItem[] = [
+    { to: '/faq', label: 'FAQ', hint: 'Answers to common questions', icon: CircleHelp },
+    { to: '/contact', label: 'Contact us', hint: 'Get in touch with the store', icon: Headset },
+  ]
+
+  const legal: MenuItem[] = [
+    { to: '/about', label: 'About us', hint: 'Who we are', icon: Info },
+    { to: '/privacy', label: 'Privacy Policy', hint: 'How we look after your data', icon: ShieldCheck },
+    { to: '/terms', label: 'Terms and Conditions', hint: 'The rules for using the store', icon: FileText },
+  ]
+
   async function handleSignOut() {
     await signOut()
     navigate('/')
@@ -57,25 +96,20 @@ export default function AccountHome() {
         </div>
       </div>
 
-      <ul className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200">
-        {menu.map(({ to, label, hint, icon: Icon }) => (
-          <li key={to}>
-            <Link to={to} className="flex items-center gap-4 px-4 py-4 hover:bg-gray-50">
-              <Icon size={20} className="shrink-0 text-gray-500" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">{label}</p>
-                <p className="truncate text-xs text-gray-500">{hint}</p>
-              </div>
-              <ChevronRight size={18} className="shrink-0 text-gray-300" />
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <MenuList items={menu} />
 
       <div className="mt-4 space-y-3">
         <OrderAlertsCard />
         <InstallApp variant="card" />
       </div>
+
+      <Section title="Customer care">
+        <MenuList items={customerCare} />
+      </Section>
+
+      <Section title="Legal">
+        <MenuList items={legal} />
+      </Section>
 
       <button
         onClick={handleSignOut}

@@ -3,7 +3,7 @@
 // Sends order-update push notifications to CUSTOMERS (the owner's alerts are notify-order).
 //
 // Two ways to call it:
-//   1. A Database Webhook on the `orders` table (event: Update) with the secret header.
+//   1. The database trigger `order_customer_notify` (see supabase/customer-push.sql) with the secret header.
 //      -> when an order's status changes (or a refund completes), the customer is notified.
 //   2. A logged-in customer pressing "Test" on their account page.
 //      -> sends a test notification to their own devices.
@@ -94,6 +94,8 @@ function messageFor(rec: any, old: any): { title: string; body: string } | null 
       case 'delivered':
         return { title: `Order ${n} delivered`, body: 'Enjoy your find! Tap to tell us how it went.' }
       case 'cancelled': {
+        // An unpaid checkout that was abandoned or expired isn't worth a notification.
+        if (old.status === 'pending_payment') return null
         const paidOnline =
           rec.payment_method === 'online' && ['paid', 'refund_pending', 'refunded'].includes(rec.payment_status)
         return {

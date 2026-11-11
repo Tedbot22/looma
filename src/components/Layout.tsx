@@ -12,37 +12,40 @@ import Logos from './Logos'
 import Footer from './Footer'
 import ReviewPromptBanner from '../components/ReviewPromptBanner'
 import SupportChat from './SupportChat'
+import NotificationPrompt from './NotificationPrompt'
+import { useIsStandalone } from '../hooks/useInstallApp'
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `text-sm font-medium transition-colors ${isActive ? 'text-brand' : 'text-gray-500 hover:text-brand'
+  `text-sm font-medium transition-colors ${
+    isActive ? 'text-brand' : 'text-gray-500 hover:text-brand'
   }`
-// Pages where the footer is just noise: sign-in, checkout/order steps, the account area and 404.
-// To hide it somewhere else, add the path start here. To bring it back, remove it.
-   // "Focused" pages: sign-in, checkout/order steps, review submission and the account area.
-   // They hide the footer and the header search so people stay on the task.
-   // To hide them somewhere else, add the path start here. To bring them back, remove it.
-   const FOCUSED_PREFIXES = ['/login', '/signup', '/checkout', '/order', '/review', '/account']
-   const FOOTER_PAGES = ['/', '/shop', '/product', '/cart', '/about', '/faq', '/privacy', '/terms', '/contact', '/recommended', '/recently-viewed', '/reviews', '/wishlist']
 
-   const matches = (pathname: string, base: string) =>
-     base === '/' ? pathname === '/' : pathname === base || pathname.startsWith(base + '/')
+// "Focused" pages: sign-in, checkout/order steps, review submission and the account area.
+// They hide the footer and the header search so people stay on the task.
+// To hide them somewhere else, add the path start here. To bring them back, remove it.
+const FOCUSED_PREFIXES = ['/login', '/signup', '/checkout', '/order', '/review', '/account']
+const FOOTER_PAGES = ['/', '/shop', '/product', '/cart', '/about', '/faq', '/privacy', '/terms', '/contact', '/recommended', '/recently-viewed', '/reviews', '/wishlist']
 
-   const isFocusedPage = (pathname: string) => FOCUSED_PREFIXES.some((p) => matches(pathname, p))
+const matches = (pathname: string, base: string) =>
+  base === '/' ? pathname === '/' : pathname === base || pathname.startsWith(base + '/')
 
-   // Footer only on known public pages (so the "Page not found" screen doesn't get one).
-   const shouldShowFooter = (pathname: string) =>
-     !isFocusedPage(pathname) && FOOTER_PAGES.some((p) => matches(pathname, p))
+const isFocusedPage = (pathname: string) => FOCUSED_PREFIXES.some((p) => matches(pathname, p))
+
+// Footer only on known public pages (so the "Page not found" screen doesn't get one).
+const shouldShowFooter = (pathname: string) =>
+  !isFocusedPage(pathname) && FOOTER_PAGES.some((p) => matches(pathname, p))
 
 export default function Layout() {
+  const { pathname } = useLocation()
+  const standalone = useIsStandalone() // running as the installed app
+  // The installed app has no footer: its links live under Account (Customer care and Legal).
+  const showFooter = shouldShowFooter(pathname) && !standalone
+  const showSearch = !isFocusedPage(pathname)
   const { count } = useCart()
   const { data: profile } = useProfile()
   useRealtimeStock() // items flip to "Sold out" live, without a refresh
   const { user } = useAuth()
   const [params] = useSearchParams()
-  const { pathname } = useLocation()
-  const showFooter = shouldShowFooter(pathname)
-  const showSearch = !isFocusedPage(pathname)
-
 
   // Invite links look like https://yourstore.com/?ref=AB12CD34.
   // Remember the code so it can pre-fill the signup form, even if they browse first.
@@ -66,9 +69,9 @@ export default function Layout() {
             <Logos />
           </Link>
 
-            {showSearch && <HeaderSearch className="order-3 w-full min-w-0 md:order-2" />}
+          {showSearch && <HeaderSearch className="order-3 w-full min-w-0 md:order-2" />}
 
-          <nav className="order-2 ml-auto flex items-center gap-5 md:order-3 md:ml-0 md:justify-self-end md:gap-6">
+          <nav className="order-2 ml-auto flex items-center gap-5 md:order-3 md:col-start-3 md:ml-0 md:justify-self-end md:gap-6">
             <NavLink to="/" end className={`${navLinkClass} hidden md:block`}>
               Home
             </NavLink>
@@ -108,6 +111,7 @@ export default function Layout() {
 
       <ReviewPromptBanner />
       <SupportChat />
+      <NotificationPrompt enabled={!isFocusedPage(pathname)} />
       {showFooter && <Footer />}
     </div>
   )

@@ -80,3 +80,10 @@ export async function promptInstall(): Promise<boolean> {
   const { outcome } = await event.userChoice
   return outcome === 'accepted'
 }
+
+// Lets components react if the app switches between browser tab and installed-app window.
+export function subscribeStandalone(listener: () => void) {
+  const query = window.matchMedia('(display-mode: standalone)')
+  query.addEventListener('change', listener)
+  return () => query.removeEventListener('change', listener)
+}

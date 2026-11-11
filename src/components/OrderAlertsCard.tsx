@@ -7,7 +7,7 @@ const WHAT = 'when your order is confirmed, out for delivery or delivered'
 // "card" lives on the account page and shows every state.
 // "compact" is a small nudge on an order page and only appears when notifications are still off.
 export default function OrderAlertsCard({ variant = 'card' }: { variant?: 'card' | 'compact' }) {
-  const { state, busy, enable, disable, sendTest } = useCustomerPush()
+  const { state, busy, enable, disable } = useCustomerPush()
 
   if (state === 'checking' || state === 'unconfigured') return null
 
@@ -47,36 +47,28 @@ export default function OrderAlertsCard({ variant = 'card' }: { variant?: 'card'
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">Order updates</p>
           <p className="text-xs text-gray-500">
-            {state === 'on' ? 'On for this device' : (notes[state] ?? `Get a notification ${WHAT}`)}
+            {state === 'on' ? 'On for this device' : state === 'off' ? 'Off for this device' : (notes[state] ?? `Get a notification ${WHAT}`)}
           </p>
         </div>
 
-        {state === 'off' && (
+        {(state === 'on' || state === 'off') && (
           <button
-            onClick={enable}
+            type="button"
+            role="switch"
+            aria-checked={state === 'on'}
+            aria-label="Order updates"
+            onClick={state === 'on' ? disable : enable}
             disabled={busy}
-            className="shrink-0 rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-light disabled:opacity-60"
+            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
+              state === 'on' ? 'bg-brand' : 'bg-gray-300'
+            }`}
           >
-            Turn on
+            <span
+              className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                state === 'on' ? 'translate-x-5' : ''
+              }`}
+            />
           </button>
-        )}
-        {state === 'on' && (
-          <div className="flex shrink-0 gap-2">
-            <button
-              onClick={sendTest}
-              disabled={busy}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:border-brand disabled:opacity-60"
-            >
-              Test
-            </button>
-            <button
-              onClick={disable}
-              disabled={busy}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium hover:border-brand disabled:opacity-60"
-            >
-              Turn off
-            </button>
-          </div>
         )}
       </div>
       {state === 'needs-install' && <InstallApp variant="card" className="mt-3" />}
