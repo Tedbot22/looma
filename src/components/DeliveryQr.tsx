@@ -143,15 +143,14 @@ export default function DeliveryQr({ orderId }: { orderId: string }) {
           >
             <QrCode size={18} /> {busy ? 'Creating your code…' : 'Show Delivery QR'}
           </button>
-          <p className="mt-2 text-xs text-gray-600">Do this only when the rider is with you.</p>
+          <p className="mt-2 text-xs text-gray-600">Present this QR code to the delivery rider for scanning and verification.</p>
         </div>
       )}
 
       {!delivery.qr_verified && (
         <p className="mt-3 flex gap-2 text-xs text-gray-600">
           <MessageSquareText size={14} className="mt-0.5 shrink-0" />
-          Can't show the QR? Tell your rider. They can text a 6-digit code to the phone number on your order, and you read
-          it out to them.
+          Can't show the QR? Tell your delivery rider. They can request a 6-digit code to the phone number on your order.
         </p>
       )}
 
@@ -163,7 +162,7 @@ export default function DeliveryQr({ orderId }: { orderId: string }) {
 
       <p className="mt-4 flex gap-2 text-xs text-gray-600">
         <ShieldAlert size={14} className="mt-0.5 shrink-0" />
-        Never send a screenshot or share a code with anyone except the rider standing with you. Each code can only be
+        Never send a screenshot or share a code with anyone except the delivery rider standing with you. Each code can only be
         used once.
       </p>
     </section>

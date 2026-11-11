@@ -85,7 +85,7 @@ export default function InstallApp({ variant, className = '' }: { variant: 'foot
           <Smartphone size={20} className="shrink-0 text-gray-500" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">Install the {STORE_NAME} app</p>
-            <p className="text-xs text-gray-500">One tap from your home screen, no browser needed</p>
+            <p className="text-xs text-gray-500">Access LOOMA directly from your home screen with just one tap.</p>
           </div>
           <button
             type="button"

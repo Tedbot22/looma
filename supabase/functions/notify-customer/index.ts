@@ -89,10 +89,10 @@ function messageFor(rec: any, old: any): { title: string; body: string } | null 
       case 'out_for_delivery':
         return {
           title: `Order ${n} is on the way`,
-          body: 'Your rider is heading to you. Keep your phone close and have your delivery QR code or code ready.',
+          body: 'Your rider is on the way. Please keep your phone nearby and have your delivery QR code or OTP ready for verification..',
         }
       case 'delivered':
-        return { title: `Order ${n} delivered`, body: 'Enjoy your find! Tap to tell us how it went.' }
+        return { title: `Order ${n} delivered`, body: ' Your order has been delivered successfully. Thank you for choosing Looma' }
       case 'cancelled': {
         // An unpaid checkout that was abandoned or expired isn't worth a notification.
         if (old.status === 'pending_payment') return null
@@ -111,7 +111,7 @@ function messageFor(rec: any, old: any): { title: string; body: string } | null 
   if (old && rec.payment_status !== old.payment_status && rec.payment_status === 'refunded') {
     return {
       title: `Refund sent for order ${n}`,
-      body: 'Your refund has been issued. Your bank may take a few days to show it.',
+      body: '`Your refund has been processed successfully. Please allow a few business days for the funds to reflect in your bank account.`',
     }
   }
   return null

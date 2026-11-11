@@ -70,13 +70,13 @@ export default function AccountHome() {
 
   const customerCare: MenuItem[] = [
     { to: '/faq', label: 'FAQ', hint: 'Answers to common questions', icon: CircleHelp },
-    { to: '/contact', label: 'Contact us', hint: 'Get in touch with the store', icon: Headset },
+    { to: '/contact', label: 'Contact us', hint: 'Get in touch with us', icon: Headset },
   ]
 
   const legal: MenuItem[] = [
     { to: '/about', label: 'About us', hint: 'Who we are', icon: Info },
-    { to: '/privacy', label: 'Privacy Policy', hint: 'How we look after your data', icon: ShieldCheck },
-    { to: '/terms', label: 'Terms and Conditions', hint: 'The rules for using the store', icon: FileText },
+    { to: '/privacy', label: 'Privacy Policy', hint: 'How We Protect Your Data', icon: ShieldCheck },
+    { to: '/terms', label: 'Terms and Conditions', hint: 'Store Guidelines', icon: FileText },
   ]
 
   async function handleSignOut() {

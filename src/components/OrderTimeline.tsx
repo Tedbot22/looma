@@ -9,6 +9,9 @@ const STEPS: { key: Order['status']; label: string }[] = [
   { key: 'delivered', label: 'Delivered' },
 ]
 
+// Automatic notes we don't want to show customers in the timeline.
+const HIDDEN_NOTE = /^\s*your order is on the way/i
+
 const when = (iso: string) =>
   new Date(iso).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -101,7 +104,9 @@ function Row({
       <div className="pb-6">
         <p className={`text-sm font-medium ${done ? 'text-gray-900' : 'text-gray-400'}`}>{label}</p>
         {event && <p className="text-xs text-gray-400">{when(event.created_at)}</p>}
-        {event?.note && <p className="mt-1 rounded-md bg-gray-50 px-2.5 py-1.5 text-sm text-gray-600">{event.note}</p>}
+        {event?.note && !HIDDEN_NOTE.test(event.note) && (
+          <p className="mt-1 rounded-md bg-gray-50 px-2.5 py-1.5 text-sm text-gray-600">{event.note}</p>
+        )}
       </div>
     </li>
   )
