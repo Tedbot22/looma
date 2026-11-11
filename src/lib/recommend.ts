@@ -259,27 +259,49 @@ export function recommend(
 }
 
 // ---------- "You may also like" (product page) ----------
-// Unlike recommend() above, this doesn't look at the customer at all. It answers one question:
-// "which in-stock items are most like THIS product?" (same category first, then shared words in the
-// name, price level and colour). If the shop doesn't have enough close matches, random in-stock items fill the gaps.
+// One algorithm for the product page: "which in-stock items go with THIS product, for THIS customer?"
+//
+//  - The product on the page is the anchor: it always counts the most, so the row stays about what the
+//    customer is looking at (same category first, then shared words in the name, price level and colour).
+//  - What the customer has viewed, wishlisted, put in the cart and bought is mixed in at up to half the
+//    weight of the anchor, so among equally good matches the ones that fit their taste come first.
+//    A customer with little or no history gets (almost) pure "similar to this item".
+//  - If the shop doesn't have enough close matches, random in-stock items fill the gaps.
+const ANCHOR_WEIGHT = 1
+const MAX_TASTE_SHARE = 0.5 // the customer's history at full strength, compared with the anchor
+const FULL_HISTORY = 5 // roughly "one purchase" worth of signals: below this the history counts for less
+
 export function similarTo(
   pool: ProductWithVariants[],
   product: ProductWithVariants,
-  options: { limit: number; seed: number }
+  options: { limit: number; seed: number; interactions?: Interactions; now?: number }
 ): ProductWithVariants[] {
-  const { limit, seed } = options
+  const { limit, seed, interactions, now = Date.now() } = options
 
   // The product on the page may not be in the pool (the pool is capped), so make sure it can be looked up.
   const byId = new Map(pool.map((p) => [p.id, p]))
   byId.set(product.id, product)
-  const taste = buildTaste([{ productId: product.id, weight: 1 }], byId)
+
+  // The customer's own signals, scaled down so the anchor stays in charge.
+  const history = interactions ? buildSignals(interactions, now).filter((s) => s.productId !== product.id) : []
+  const historyTotal = history.reduce((sum, s) => sum + Math.max(0, s.weight), 0)
+  const scale = historyTotal > 0 ? (MAX_TASTE_SHARE * Math.min(1, historyTotal / FULL_HISTORY)) / historyTotal : 0
+  const signals: Signal[] = [
+    { productId: product.id, weight: ANCHOR_WEIGHT },
+    ...history.map((s) => ({ productId: s.productId, weight: s.weight * scale })),
+  ]
+
+  const taste = buildTaste(signals, byId)
   const max = { cat: maxOf(taste.category), tok: maxOf(taste.token), col: maxOf(taste.colour) }
 
-  // Only things that can be bought right now, and never the product being viewed.
+  // Only things that can be bought right now, never the product being viewed, and nothing the customer
+  // already has in the cart or has bought.
+  const have = new Set<string>([...(interactions?.cartProductIds ?? []), ...(interactions?.purchases.map((p) => p.productId) ?? [])])
   const available = pool.filter((p) => p.id !== product.id && inStock(p))
+  const fresh = available.filter((p) => !have.has(p.id))
 
   // No penalty for repeating a category here: on a "similar items" row, the same category is the point.
-  const picked = available
+  const picked = fresh
     .map((p) => ({ p, ...scoreProduct(p, taste, max) }))
     .filter((c) => c.related && c.score >= MIN_SIMILARITY)
     .sort((a, b) => b.score - a.score) // ties keep the pool's order (newest first)
@@ -288,9 +310,14 @@ export function similarTo(
 
   // Not enough close matches: fill with random in-stock items.
   const pickedIds = new Set(picked.map((p) => p.id))
-  for (const p of shuffle(available, seed)) {
-    if (picked.length >= limit) break
-    if (!pickedIds.has(p.id)) picked.push(p)
+  for (const source of [fresh, available]) {
+    for (const p of shuffle(source, seed)) {
+      if (picked.length >= limit) return picked
+      if (!pickedIds.has(p.id)) {
+        picked.push(p)
+        pickedIds.add(p.id)
+      }
+    }
   }
   return picked
 }

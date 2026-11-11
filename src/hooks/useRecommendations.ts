@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { getViewStats } from '../lib/recentlyViewed'
-import { getSessionSeed, recommend } from '../lib/recommend'
+import { getSessionSeed, recommend, type Interactions } from '../lib/recommend'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { useWishlist } from '../context/WishlistContext'
@@ -28,18 +28,16 @@ export function useProductPool() {
   })
 }
 
-// "Recommended for you": gathers what this customer has done (views on this device, wishlist, cart and,
-// when logged in, past purchases) and asks the recommend() algorithm for similar items from the shop.
-export function useRecommendations(limit: number) {
+// Gathers what this customer has done (views on this device, wishlist, cart and, when logged in, past
+// purchases) in the shape the recommendation algorithm wants. Used by both "Recommended for you" and the
+// product page's "You may also like".
+export function useCustomerInteractions(): Interactions {
   const { user } = useAuth()
   const { items: wishlist } = useWishlist()
   const { items: cart } = useCart()
 
   // Read once when the page opens: the picks shouldn't shuffle while someone is browsing the page.
   const [views] = useState(getViewStats)
-  const [seed] = useState(getSessionSeed)
-
-  const pool = useProductPool()
 
   // What this customer has actually bought (cancelled orders don't count).
   const purchases = useQuery({
@@ -70,19 +68,27 @@ export function useRecommendations(limit: number) {
     },
   })
 
-  const result = useMemo(() => {
-    if (!pool.data) return null
-    return recommend(
-      pool.data,
-      {
-        views,
-        wishlistProductIds: wishlist.map((w) => w.productId),
-        cartProductIds: cart.map((c) => c.productId),
-        purchases: purchases.data ?? [],
-      },
-      { limit, seed }
-    )
-  }, [pool.data, views, wishlist, cart, purchases.data, limit, seed])
+  return useMemo(
+    () => ({
+      views,
+      wishlistProductIds: wishlist.map((w) => w.productId),
+      cartProductIds: cart.map((c) => c.productId),
+      purchases: purchases.data ?? [],
+    }),
+    [views, wishlist, cart, purchases.data]
+  )
+}
+
+// "Recommended for you": asks the recommend() algorithm for items similar to what this customer likes.
+export function useRecommendations(limit: number) {
+  const interactions = useCustomerInteractions()
+  const [seed] = useState(getSessionSeed)
+  const pool = useProductPool()
+
+  const result = useMemo(
+    () => (pool.data ? recommend(pool.data, interactions, { limit, seed }) : null),
+    [pool.data, interactions, limit, seed]
+  )
 
   return {
     items: result?.items ?? [],

@@ -19,7 +19,7 @@ export default function YouMayAlsoLike({ product }: { product: ProductWithVarian
           You may also like
         </h2>
         <Link
-          to={`/shop/${product.category_id}`}
+          to={`/recommended?like=${product.id}`}
           className="flex shrink-0 items-center gap-1.5 rounded-full border border-gray-300 px-4 py-2 text-sm font-medium hover:border-brand hover:text-brand"
         >
           More like this <ArrowRight size={15} />
