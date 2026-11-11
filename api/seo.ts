@@ -1,19 +1,43 @@
-import {
-  DEFAULT_DESCRIPTION,
-  DEFAULT_TITLE,
-  SHARE_IMAGE,
-  STORE_NAME,
-  escapeHtml,
-  isUuid,
-  siteOrigin,
-  supabaseGet,
-  tidy,
-} from './_shared'
-
 // Crawlers that don't run JavaScript (WhatsApp, Facebook, X, Telegram, and sometimes Bing) would only ever see the
 // plain home-page tags on a product link. vercel.json sends those crawlers' requests for /product/:id and /shop/:id
 // here. We return the normal app page with the title, description, picture and Product data for that item filled in.
 // Real visitors never come through here; they get the normal app.
+// Self-contained on purpose: Vercel runs this as an ES module, where importing a sibling file without its extension fails.
+
+const STORE_NAME = 'Looma'
+const SHARE_IMAGE = '/og-image.png'
+const DEFAULT_TITLE = 'Looma | Thrift Fashion & Clothing Brand in Nigeria'
+const DEFAULT_DESCRIPTION =
+  'Looma brings you affordable thrift fashion and standout styles made for everyday confidence.'
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const isUuid = (v: string | null): v is string => !!v && UUID.test(v)
+
+/** The store's public address: VITE_SITE_URL if set, otherwise the address this request came in on. */
+function siteOrigin(request: Request): string {
+  const configured = (process.env.VITE_SITE_URL || process.env.SITE_URL || '').replace(/\/$/, '')
+  if (configured) return configured
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || ''
+  return `https://${host}`
+}
+
+/** Reads rows from Supabase with the public (anon) key, the same access the storefront has. */
+async function supabaseGet<T>(path: string): Promise<T[]> {
+  const base = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
+  const key = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
+  if (!base || !key) throw new Error('Supabase address or key is missing in the Vercel environment variables')
+  const res = await fetch(`${base}/rest/v1/${path}`, { headers: { apikey: key, Authorization: `Bearer ${key}` } })
+  if (!res.ok) throw new Error(`Supabase answered ${res.status}`)
+  return (await res.json()) as T[]
+}
+
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+function tidy(text: string | null | undefined, max = 155): string {
+  const flat = (text ?? '').replace(/\s+/g, ' ').trim()
+  return flat.length <= max ? flat : flat.slice(0, max - 1).replace(/\s+\S*$/, '') + '…'
+}
 
 interface ProductRow {
   id: string
@@ -58,7 +82,7 @@ export async function GET(request: Request) {
     data = null
   }
 
-  // Unknown id or a database problem: send the plain app page, kept out of search results if the item doesn't exist.
+  // Unknown id or a database problem: send the plain app page, kept out of search results.
   const seo: SeoData = data ?? {
     title: DEFAULT_TITLE,
     description: DEFAULT_DESCRIPTION,
@@ -85,7 +109,7 @@ async function productSeo(origin: string, id: string): Promise<SeoData | null> {
   const images = p.images ?? []
   return {
     title: `${p.name} | ${STORE_NAME}`,
-    description: tidy(p.description) || `Buy ${p.name} at ${STORE_NAME}. Your style. Your confidence. Thrift fashion delivered to you.`,
+    description: tidy(p.description) || `Buy ${p.name} at ${STORE_NAME}. Thrift fashion in Nigeria, delivered to you.`,
     path: `/product/${p.id}`,
     image: images[0] ?? SHARE_IMAGE,
     ogType: 'product',
@@ -119,7 +143,7 @@ async function categorySeo(_origin: string, id: string): Promise<SeoData | null>
   if (!c) return null
   return {
     title: `${c.name} | Thrift Clothing | ${STORE_NAME}`,
-    description: `Shop thrift ${c.name.toLowerCase()} at ${STORE_NAME}. Your style. Your confidence. Thrift fashion delivered to you.`,
+    description: `Shop thrift ${c.name.toLowerCase()} at ${STORE_NAME}. Affordable, pre-loved pieces delivered in Nigeria.`,
     path: `/shop/${c.id}`,
     image: SHARE_IMAGE,
     ogType: 'website',
