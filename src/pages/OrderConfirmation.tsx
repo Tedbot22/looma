@@ -12,6 +12,7 @@ import { cancelOrder, startPayment, verifyPayment } from '../lib/payments'
 import OrderTimeline from '../components/OrderTimeline'
 import DeliveryQr from '../components/DeliveryQr'
 import { OrderReviewSection } from '../components/RateOrder'
+import OrderAlertsCard from '../components/OrderAlertsCard'
 import type { OrderEvent, OrderWithItems } from '../lib/types'
 
 const STATUS_LABEL: Record<OrderWithItems['status'], string> = {
@@ -286,6 +287,13 @@ export default function OrderConfirmation() {
       {order.status === 'delivered' && (
         <div className="mt-6">
           <OrderReviewSection orderId={order.id} orderNumber={order.order_number} />
+        </div>
+      )}
+
+      {/* Offer notifications while the order is still on its way */}
+      {(order.status === 'placed' || order.status === 'confirmed' || order.status === 'out_for_delivery') && (
+        <div className="mt-6">
+          <OrderAlertsCard variant="compact" />
         </div>
       )}
 

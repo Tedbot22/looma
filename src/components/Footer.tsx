@@ -9,6 +9,7 @@ import { whatsappLink } from '../lib/whatsapp'
 import { useAppSettings } from '../hooks/useAppSettings'
 import { FacebookIcon, InstagramIcon, TikTokIcon } from './SocialIcons'
 import Logo from '../components/Logo'
+import InstallApp from '../components/InstallApp'
 import type { Category } from '../lib/types'
 
 const linkClass = 'text-sm text-gray-300 hover:text-white hover:underline'
@@ -123,6 +124,8 @@ export default function Footer() {
           >
             <MessageCircle size={16} /> Chat with us on WhatsApp
           </a>
+
+          <InstallApp variant="footer" className="mt-3" />
 
           {socials.length > 0 && (
             <div className="mt-5 flex gap-3">

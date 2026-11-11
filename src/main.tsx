@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import './index.css'
+import './lib/install' // starts listening for the browser's install event right away
 import App from './App'
 import { CartProvider } from './context/CartContext'
 import { WishlistProvider } from './context/WishlistContext'

@@ -6,6 +6,8 @@ import { useWishlist } from '../../context/WishlistContext'
 import { useProfile } from '../../hooks/useProfile'
 import { useCoupons } from '../../hooks/useCoupons'
 import { couponStatus } from '../../lib/coupons'
+import OrderAlertsCard from '../../components/OrderAlertsCard'
+import InstallApp from '../../components/InstallApp'
 
 interface MenuItem {
   to: string
@@ -69,6 +71,11 @@ export default function AccountHome() {
           </li>
         ))}
       </ul>
+
+      <div className="mt-4 space-y-3">
+        <OrderAlertsCard />
+        <InstallApp variant="card" />
+      </div>
 
       <button
         onClick={handleSignOut}

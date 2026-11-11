@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { detachThisDevice } from '../lib/push'
 
 interface AuthContextValue {
   user: User | null
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: session?.user ?? null,
     loading,
     signOut: async () => {
+      await detachThisDevice() // needs the login, so it runs first
       await supabase.auth.signOut()
     },
   }
