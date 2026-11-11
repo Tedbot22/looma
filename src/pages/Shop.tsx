@@ -4,6 +4,7 @@ import { NavLink, useLocation, useParams, useSearchParams } from 'react-router-d
 import { SlidersHorizontal, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatNaira } from '../lib/format'
+import { searchProducts } from '../lib/search'
 import ProductCard from '../components/ProductCard'
 import { ChipsSkeleton, ProductGridSkeleton } from '../components/Skeleton'
 import type { Category, ProductWithVariants } from '../lib/types'
@@ -94,28 +95,27 @@ export default function Shop() {
     },
   })
 
-  // Characters that have a special meaning in the search filter are removed, so typing a comma or a
-  // bracket can never break the query.
-  const term = q.replace(/[%_,()*"\\]/g, ' ').replace(/\s+/g, ' ').trim()
+  // The search words are matched on the device (see lib/search.ts), against the name, category, colour,
+  // size, details and description. So the database is only asked for the category and price range, and
+  // typing a new search re-ranks the results instantly without another request.
+  const term = q.replace(/\s+/g, ' ').trim()
 
   const {
-    data: products,
+    data: allProducts,
     isLoading,
     isPlaceholderData,
     error,
   } = useQuery({
-    // The key includes everything that changes the results, so each search is cached on its own.
-    queryKey: ['products', categoryId ?? 'all', term, minNum, maxNum],
+    queryKey: ['products', categoryId ?? 'all', minNum, maxNum],
     placeholderData: (previous) => previous, // keep showing the last results while new ones load
     queryFn: async (): Promise<ProductWithVariants[]> => {
       let query = supabase
         .from('products')
-        .select('*, product_variants(*)')
+        .select('*, product_variants(*), categories(name)')
         .eq('is_active', true)
         .order('created_at', { ascending: false })
 
       if (categoryId) query = query.eq('category_id', categoryId)
-      if (term) query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`)
       if (minNum !== null) query = query.gte('price', minNum)
       if (maxNum !== null) query = query.lte('price', maxNum)
 
@@ -124,6 +124,9 @@ export default function Shop() {
       return data as ProductWithVariants[]
     },
   })
+
+  // With a search, show only the matches, best match first. Without one, show everything newest first.
+  const products = term && allProducts ? searchProducts(allProducts, term).map((h) => h.item) : allProducts
 
   const filtering = term !== '' || hasPrice
   const priceLabel =
