@@ -6,6 +6,8 @@ import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { discountPercent } from '../lib/format'
 import { whatsappLink } from '../lib/whatsapp'
+import { absoluteUrl, pageTitle, tidy, useSeo } from '../lib/seo'
+import { STORE_NAME } from '../config'
 import { addRecentId } from '../lib/recentlyViewed'
 import { useCart } from '../context/CartContext'
 import { useWishlist } from '../context/WishlistContext'
@@ -62,6 +64,44 @@ export default function ProductPage() {
     setSelectedId(null)
     setQuantity(1)
   }, [productId])
+
+  // What Google and link previews (WhatsApp, Facebook) show for this item, plus Product data so Google can
+  // show the price and availability. Hidden items stay out of search results.
+  useSeo(
+    isLoading || error
+      ? null
+      : !product
+        ? { title: pageTitle('Item unavailable'), noindex: true }
+        : {
+            title: pageTitle(product.name),
+            description:
+              tidy(product.description) ||
+              `Buy ${product.name} at ${STORE_NAME}. Thrift fashion in Nigeria, delivered to you.`,
+            path: `/product/${product.id}`,
+            image: product.images[0],
+            ogType: 'product',
+            jsonLd: {
+              '@context': 'https://schema.org',
+              '@type': 'Product',
+              name: product.name,
+              description: tidy(product.description, 500) || product.name,
+              sku: product.id,
+              image: product.images.map(absoluteUrl),
+              ...(product.categories?.name ? { category: product.categories.name } : {}),
+              offers: {
+                '@type': 'Offer',
+                url: absoluteUrl(`/product/${product.id}`),
+                priceCurrency: 'NGN',
+                price: product.price,
+                itemCondition: 'https://schema.org/UsedCondition',
+                availability: product.product_variants.some((v) => v.is_active && v.stock > 0)
+                  ? 'https://schema.org/InStock'
+                  : 'https://schema.org/OutOfStock',
+                seller: { '@type': 'Organization', name: STORE_NAME },
+              },
+            },
+          }
+  )
 
   if (isLoading) return <ProductPageSkeleton />
   if (error) return <p className="py-20 text-center text-red-600">Couldn't load this item.</p>

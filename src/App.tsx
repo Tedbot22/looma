@@ -39,6 +39,7 @@ const AdminSupport = lazy(() => import('./pages/admin/AdminSupport'))
 const ComingSoon = lazy(() => import('./pages/ComingSoon'))
 const RiderDelivery = lazy(() => import('./pages/RiderDelivery'))
 import ScrollToTop from './components/ScrollToTop'
+import RouteSeo from './components/RouteSeo'
 
 function PageFallback() {
   return (
@@ -53,6 +54,7 @@ export default function App() {
   return (
     <BrowserRouter>
     <ScrollToTop />
+    <RouteSeo />
       {/* Each page is its own chunk, downloaded the first time it is visited. */}
       <Suspense fallback={<PageFallback />}>
       <Routes>

@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "LOOMA",
-  "short_name": "LOOMA",
-  "description": "Thrift fashion. Style. Confidence. You.",
+  "name": "Looma",
+  "short_name": "Looma",
+  "description": "Style. Confidence. You.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

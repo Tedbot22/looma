@@ -1,3 +1,38 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    {
+      "source": "/robots.txt",
+      "destination": "/api/robots"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    },
+    {
+      "source": "/product/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(Googlebot|bingbot|Bingbot|BingPreview|facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|TelegramBot|Slackbot|Discordbot|Pinterest|Applebot|DuckDuckBot|YandexBot|Baiduspider).*"
+        }
+      ],
+      "destination": "/api/seo?type=product&id=:id"
+    },
+    {
+      "source": "/shop/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(Googlebot|bingbot|Bingbot|BingPreview|facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|TelegramBot|Slackbot|Discordbot|Pinterest|Applebot|DuckDuckBot|YandexBot|Baiduspider).*"
+        }
+      ],
+      "destination": "/api/seo?type=category&id=:id"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
 }

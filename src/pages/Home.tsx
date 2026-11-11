@@ -9,6 +9,7 @@ import HeroCarousel, { type Banner } from '../components/HeroCarousel'
 import ProductCard from '../components/ProductCard'
 import { ChipsSkeleton, HeroSkeleton, ProductGridSkeleton } from '../components/Skeleton'
 import type { Category } from '../lib/types'
+import { STORE_NAME } from '../config'
 
 // A titled row of products, with a button to see the full list.
 function Section({ title, subtitle, to, children }: { title: string; subtitle?: string; to: string; children: ReactNode }) {
@@ -63,6 +64,8 @@ export default function Home() {
 
   return (
     <div>
+      {/* The page's main heading for search engines. Screen readers get it too. */}
+      <h1 className="sr-only">{STORE_NAME}: thrift fashion and clothing in Nigeria</h1>
       {bannersLoading ? (
         <HeroSkeleton />
       ) : banners && banners.length > 0 ? (

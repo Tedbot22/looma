@@ -5,6 +5,8 @@ import { SlidersHorizontal, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatNaira } from '../lib/format'
 import { searchProducts } from '../lib/search'
+import { pageTitle, useSeo } from '../lib/seo'
+import { STORE_NAME } from '../config'
 import ProductCard from '../components/ProductCard'
 import { ChipsSkeleton, ProductGridSkeleton } from '../components/Skeleton'
 import type { Category, ProductWithVariants } from '../lib/types'
@@ -129,6 +131,19 @@ export default function Shop() {
   const products = term && allProducts ? searchProducts(allProducts, term).map((h) => h.item) : allProducts
 
   const filtering = term !== '' || hasPrice
+
+  // A category page gets its own title for Google (the plain /shop page is handled in RouteSeo).
+  const category = categoryId ? categories?.find((c) => c.id === categoryId) : undefined
+  useSeo(
+    category
+      ? {
+          title: pageTitle(`${category.name} | Thrift Clothing`),
+          description: `Shop thrift ${category.name.toLowerCase()} at ${STORE_NAME}. Affordable, pre-loved pieces delivered in Nigeria.`,
+          path: `/shop/${category.id}`,
+          noindex: filtering,
+        }
+      : null
+  )
   const priceLabel =
     minNum !== null && maxNum !== null
       ? `${formatNaira(minNum)} to ${formatNaira(maxNum)}`
@@ -141,7 +156,7 @@ export default function Shop() {
   return (
     <div>
       <div className="mb-5 flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">{term ? `Results for “${q.trim()}”` : 'Shop'}</h1>
+        <h1 className="text-2xl font-bold">{term ? `Results for “${q.trim()}”` : (category?.name ?? 'Shop')}</h1>
 
         <button
           type="button"

@@ -13,3 +13,18 @@ export const WHATSAPP_NUMBER = '2348145043953' // TODO: replace with the owner's
 
 // Where an invite code (from a ?ref=CODE link) is remembered until the visitor signs up.
 export const REFERRAL_KEY = 'looma-ref'
+
+// ---- Search engine (SEO) text. Change these to match how you want the store to appear on Google. ----
+// Keep the title under about 60 characters and the description under about 155.
+export const SEO_TITLE = 'Looma | Thrift Fashion & Clothing Brand in Nigeria'
+export const SEO_DESCRIPTION =
+  'Looma brings you affordable thrift fashion and standout styles made for everyday confidence.'
+
+// The store\'s public web address, with no slash at the end (e.g. https://looma.ng). Set VITE_SITE_URL in Vercel once you
+// have your own domain. Until then the address the visitor is on is used.
+export const SITE_URL: string =
+  ((import.meta.env.VITE_SITE_URL as string | undefined) ?? '').replace(/\/$/, '') ||
+  (typeof window !== 'undefined' ? window.location.origin : '')
+
+// Where the share picture (WhatsApp, Facebook, X link previews) comes from. 1200 x 630 works best.
+export const SHARE_IMAGE = '/og-image.png'
