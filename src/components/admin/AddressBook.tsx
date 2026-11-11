@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useDialog } from '../../context/DialogContext'
 import AddressForm from '../AddressForm'
 import { useAddressActions, useAddresses, type AddressValues } from '../../hooks/useAddresses'
 import { useDeliveryZones } from '../../hooks/useDeliveryZones'
 
 // Manage saved home delivery addresses (shown on the Edit profile page).
 export default function AddressBook() {
+  const dialog = useDialog()
   const { data: addresses = [], isLoading } = useAddresses()
   const { data: zones = [] } = useDeliveryZones()
   const actions = useAddressActions()
@@ -97,8 +99,14 @@ export default function AddressBook() {
                 </button>
                 <button
                   aria-label="Delete address"
-                  onClick={() => {
-                    if (window.confirm('Delete this address?')) run(() => actions.remove(a.id), 'Address deleted')
+                  onClick={async () => {
+                    const ok = await dialog.confirm({
+                      title: 'Delete this address?',
+                      message: 'It will be removed from your saved addresses.',
+                      confirmLabel: 'Delete',
+                      danger: true,
+                    })
+                    if (ok) run(() => actions.remove(a.id), 'Address deleted')
                   }}
                   className="rounded p-1.5 text-gray-400 hover:text-sale"
                 >

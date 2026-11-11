@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, Bike, Copy, History, Link2, RefreshCw, Send, UserRoundPlus, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { useDialog } from '../context/DialogContext'
 import { supabase } from '../lib/supabase'
 import { whatsappLinkTo } from '../lib/whatsapp'
 import {
@@ -29,6 +30,7 @@ interface FreshLink {
 }
 
 export default function AdminDeliveryPanel({ orderId, orderNumber, orderStatus, assignments, onChanged }: Props) {
+  const dialog = useDialog()
   const [busy, setBusy] = useState(false)
   const [fresh, setFresh] = useState<FreshLink | null>(null)
   const [reassigning, setReassigning] = useState(false)
@@ -93,18 +95,32 @@ export default function AdminDeliveryPanel({ orderId, orderNumber, orderStatus, 
     if (ok) setReassigning(false)
   }
 
-  function newLink() {
+  async function newLink() {
     if (!active) return
-    if (!window.confirm('Create a new link? The current link will stop working straight away.')) return
+    const ok = await dialog.confirm({
+      title: 'Create a new rider link?',
+      message: 'The current link will stop working straight away. Send the new one to the rider.',
+      confirmLabel: 'Create new link',
+    })
+    if (!ok) return
     call('replace_delivery_link', { p_assignment_id: active.id }, (d) => {
       keepLink(d)
       toast.success('New link created. Send it to the rider.')
     })
   }
 
-  function cancelAssignment() {
+  async function cancelAssignment() {
     if (!active) return
-    const reason = window.prompt('Why is this delivery being cancelled? (optional)')
+    const reason = await dialog.prompt({
+      title: 'Cancel this delivery assignment?',
+      message: "The rider's link will stop working. The order itself stays as it is.",
+      label: 'Reason (optional)',
+      placeholder: 'e.g. Rider is no longer available',
+      confirmLabel: 'Cancel assignment',
+      cancelLabel: 'Keep assignment',
+      danger: true,
+      multiline: true,
+    })
     if (reason === null) return
     call('cancel_assignment', { p_assignment_id: active.id, p_reason: reason }, () => {
       setFresh(null)

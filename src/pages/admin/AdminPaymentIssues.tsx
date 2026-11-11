@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy } from 'lucide-react'
 import { toast } from 'sonner'
+import { useDialog } from '../../context/DialogContext'
 import { ListSkeleton } from '../../components/Skeleton'
 import { supabase } from '../../lib/supabase'
 import { retryRefund } from '../../lib/payments'
@@ -34,6 +35,7 @@ const KIND_HELP: Partial<Record<PaymentIssue['kind'], string>> = {
 }
 
 export default function AdminPaymentIssues() {
+  const dialog = useDialog()
   const queryClient = useQueryClient()
 
   const { data: issues, isLoading, error } = useQuery({
@@ -141,8 +143,13 @@ export default function AdminPaymentIssues() {
               )}
               <button
                 disabled={resolve.isPending}
-                onClick={() => {
-                  if (window.confirm('Mark this as resolved? Only do this once the money has been dealt with.')) resolve.mutate(issue.id)
+                onClick={async () => {
+                  const ok = await dialog.confirm({
+                    title: 'Mark this as resolved?',
+                    message: 'Only do this once the money has been dealt with.',
+                    confirmLabel: 'Mark resolved',
+                  })
+                  if (ok) resolve.mutate(issue.id)
                 }}
                 className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:border-brand disabled:opacity-60"
               >

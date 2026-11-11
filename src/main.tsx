@@ -8,6 +8,7 @@ import App from './App'
 import { CartProvider } from './context/CartContext'
 import { WishlistProvider } from './context/WishlistContext'
 import { AuthProvider } from './context/AuthContext'
+import { DialogProvider } from './context/DialogContext'
 
 // React Query caches server data and handles loading/error states for us.
 const queryClient = new QueryClient({
@@ -25,7 +26,9 @@ createRoot(document.getElementById('root')!).render(
       <AuthProvider>
         <CartProvider>
           <WishlistProvider>
-            <App />
+            <DialogProvider>
+              <App />
+            </DialogProvider>
           </WishlistProvider>
         </CartProvider>
       </AuthProvider>

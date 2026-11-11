@@ -3,6 +3,7 @@ import { ListSkeleton } from '../../components/Skeleton'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { MapPin, MessageCircle, Phone, Route } from 'lucide-react'
 import { toast } from 'sonner'
+import { useDialog } from '../../context/DialogContext'
 import { supabase } from '../../lib/supabase'
 import { formatNaira } from '../../lib/format'
 import { whatsappLinkTo } from '../../lib/whatsapp'
@@ -58,6 +59,7 @@ function friendlyError(message: string): string {
 }
 
 export default function AdminOrders() {
+  const dialog = useDialog()
   const [tab, setTab] = useState<(typeof TABS)[number]['key']>('placed')
   const queryClient = useQueryClient()
 
@@ -119,32 +121,50 @@ export default function AdminOrders() {
   })
 
   // The note is shown to the customer on their tracking page (e.g. who is bringing the order).
-  function sendOut(order: AdminOrder) {
-    const note = window.prompt('Note for the customer (optional), e.g. rider name and phone number:')
+  async function sendOut(order: AdminOrder) {
+    const note = await dialog.prompt({
+      title: `Send out order #${order.order_number}?`,
+      message: 'The customer will be told it is out for delivery. After this they can no longer cancel it.',
+      label: 'Note for the customer (optional)',
+      placeholder: 'e.g. Rider name and phone number',
+      confirmLabel: 'Send out',
+      multiline: true,
+    })
     if (note === null) return // cancelled
     updateStatus.mutate({ id: order.id, status: 'out_for_delivery', note })
   }
 
   // With a rider assigned, "delivered" should come from the QR check. Doing it by hand skips that, so warn first.
-  function markDelivered(order: AdminOrder, hasRider: boolean) {
-    if (
-      hasRider &&
-      !window.confirm(
-        'A rider is assigned to this order. Marking it delivered by hand SKIPS the customer QR check, ' +
-          "ends the rider's link, and is recorded as a manual override. Continue?"
-      )
-    )
-      return
+  async function markDelivered(order: AdminOrder, hasRider: boolean) {
+    if (hasRider) {
+      const ok = await dialog.confirm({
+        title: 'Mark as delivered by hand?',
+        message:
+          "A rider is assigned to this order. Marking it delivered by hand skips the customer's QR check, " +
+          "ends the rider's link, and is recorded as a manual override.",
+        confirmLabel: 'Mark delivered',
+        danger: true,
+      })
+      if (!ok) return
+    }
     updateStatus.mutate({ id: order.id, status: 'delivered' })
   }
 
-  function cancel(order: AdminOrder) {
+  async function cancel(order: AdminOrder) {
     const refundable = order.payment_method === 'online' && order.payment_status === 'paid'
-    const warning = refundable
-      ? `Cancel order #${order.order_number}? Its items go back into stock and ${formatNaira(order.total)} is refunded to the customer.`
-      : `Cancel order #${order.order_number}? Its items will go back into stock.`
-    if (!window.confirm(warning)) return
-    const note = window.prompt('Reason for the customer (optional). They will see it on their order page:')
+    // One box for both the warning and the optional reason.
+    const note = await dialog.prompt({
+      title: `Cancel order #${order.order_number}?`,
+      message: refundable
+        ? `Its items go back into stock and ${formatNaira(order.total)} is refunded to the customer.`
+        : 'Its items will go back into stock.',
+      label: 'Reason for the customer (optional)',
+      placeholder: 'They will see this on their order page',
+      confirmLabel: 'Cancel order',
+      cancelLabel: 'Keep order',
+      danger: true,
+      multiline: true,
+    })
     if (note === null) return // changed their mind
     cancelMutation.mutate({ id: order.id, note })
   }

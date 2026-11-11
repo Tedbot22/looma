@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
+import { useDialog } from '../../context/DialogContext'
 import { supabase } from '../../lib/supabase'
 import { formatNaira } from '../../lib/format'
 import { whatsappLinkTo } from '../../lib/whatsapp'
@@ -76,6 +77,7 @@ function ReferralList({ userId }: { userId: string }) {
 }
 
 export default function AdminRewards() {
+  const dialog = useDialog()
   const [tab, setTab] = useState<(typeof TABS)[number]['key']>('earned')
   const [openId, setOpenId] = useState<string | null>(null)
   const queryClient = useQueryClient()
@@ -108,9 +110,14 @@ export default function AdminRewards() {
     onError: (err) => toast.error((err as Error).message),
   })
 
-  function give(reward: AdminReward) {
-    // Keep it simple: ask which item was given (optional) so there's a record.
-    const note = window.prompt('Which item did you give? (optional, e.g. "Black tee, size M")')
+  async function give(reward: AdminReward) {
+    // Ask which item was given (optional) so there's a record.
+    const note = await dialog.prompt({
+      title: 'Mark reward as given',
+      label: 'Which item did you give? (optional)',
+      placeholder: 'e.g. Black tee, size M',
+      confirmLabel: 'Mark as given',
+    })
     if (note === null) return // they cancelled
     markGiven.mutate({ id: reward.id, note })
   }

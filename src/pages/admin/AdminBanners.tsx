@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, Eye, EyeOff, ImagePlus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useDialog } from '../../context/DialogContext'
 import { supabase } from '../../lib/supabase'
 import { uploadProductImage } from '../../lib/images'
 import { ListSkeleton } from '../../components/Skeleton'
@@ -42,6 +43,7 @@ function BannerCard({
   const [buttonLabel, setButtonLabel] = useState(banner.button_label ?? '')
   const [linkUrl, setLinkUrl] = useState(banner.link_url ?? '')
   const [busy, setBusy] = useState(false)
+  const dialog = useDialog()
 
   const changed =
     title.trim() !== (banner.title ?? '') ||
@@ -81,7 +83,13 @@ function BannerCard({
   }
 
   async function remove() {
-    if (!window.confirm('Delete this banner? This cannot be undone.')) return
+    const ok = await dialog.confirm({
+      title: 'Delete this banner?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     setBusy(true)
     const { error } = await supabase.from('hero_banners').delete().eq('id', banner.id)
     setBusy(false)

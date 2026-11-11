@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useDialog } from '../../context/DialogContext'
 import { supabase } from '../../lib/supabase'
 import { formatNaira } from '../../lib/format'
 import { useAppSettings } from '../../hooks/useAppSettings'
@@ -212,6 +213,7 @@ function TemplateForm({ initial, onDone }: { initial?: Template; onDone: () => v
 // The reward pool
 // ---------------------------------------------------------------------------
 function PoolTab() {
+  const dialog = useDialog()
   const { data: settings } = useAppSettings()
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState<string | 'new' | null>(null)
@@ -240,7 +242,13 @@ function PoolTab() {
   })
 
   async function remove(t: Template) {
-    if (!window.confirm(`Delete "${t.name}"? Vouchers already given out keep working.`)) return
+    const ok = await dialog.confirm({
+      title: `Delete "${t.name}"?`,
+      message: 'Vouchers already given out keep working.',
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     const { error } = await supabase.from('coupon_templates').delete().eq('id', t.id)
     if (error) return toast.error(error.message)
     toast.success('Reward deleted')

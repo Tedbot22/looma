@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, CheckCircle2, Clock, MessageCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { useDialog } from '../context/DialogContext'
 import { supabase } from '../lib/supabase'
 import { formatNaira } from '../lib/format'
 import { whatsappLink } from '../lib/whatsapp'
@@ -25,6 +26,7 @@ const STATUS_LABEL: Record<OrderWithItems['status'], string> = {
 }
 
 export default function OrderConfirmation() {
+  const dialog = useDialog()
   const { orderId } = useParams()
   const queryClient = useQueryClient()
   const location = useLocation()
@@ -154,12 +156,18 @@ export default function OrderConfirmation() {
     },
   })
 
-  function cancelThisOrder() {
+  async function cancelThisOrder() {
     const paidOnline = order?.payment_method === 'online' && order?.payment_status === 'paid'
-    const question = paidOnline
-      ? 'Cancel this order? Your payment will be refunded, which can take a few business days.'
-      : 'Cancel this order?'
-    if (window.confirm(question)) cancelMutation.mutate()
+    const ok = await dialog.confirm({
+      title: 'Cancel this order?',
+      message: paidOnline
+        ? 'Your payment will be refunded, which can take a few business days.'
+        : 'The items will go back on sale for other customers.',
+      confirmLabel: 'Yes, cancel order',
+      cancelLabel: 'Keep order',
+      danger: true,
+    })
+    if (ok) cancelMutation.mutate()
   }
 
   async function payNow() {
