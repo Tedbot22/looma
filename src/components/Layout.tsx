@@ -23,7 +23,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 // "Focused" pages: sign-in, checkout/order steps, review submission and the account area.
 // They hide the footer and the header search so people stay on the task.
 // To hide them somewhere else, add the path start here. To bring them back, remove it.
-const FOCUSED_PREFIXES = ['/login', '/signup', '/checkout', '/order', '/review', '/account']
+const FOCUSED_PREFIXES = ['/login', '/signup', '/checkout', '/order', '/review', '/account', '/about', '/faq', '/privacy', '/terms', '/contact', '/shop', '/product', '/cart',]
 const FOOTER_PAGES = ['/', '/shop', '/product', '/cart', '/about', '/faq', '/privacy', '/terms', '/contact', '/recommended', '/recently-viewed', '/reviews', '/wishlist']
 
 const matches = (pathname: string, base: string) =>
@@ -74,9 +74,6 @@ export default function Layout() {
           <nav className="order-2 ml-auto flex items-center gap-5 md:order-3 md:col-start-3 md:ml-0 md:justify-self-end md:gap-6">
             <NavLink to="/" end className={`${navLinkClass} hidden md:block`}>
               Home
-            </NavLink>
-            <NavLink to="/shop" className={navLinkClass}>
-              Shop
             </NavLink>
             <Link to="/cart" aria-label="Cart" className="relative text-brand">
               <ShoppingCart size={22} />
