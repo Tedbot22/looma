@@ -91,6 +91,13 @@ export interface PublicReview {
   reviewer_name: string
 }
 
+// A product a review is linked to (from the public_review_products view).
+export interface ReviewProduct {
+  review_id: string
+  product_id: string
+  product_name: string
+}
+
 // The totals from store_review_stats().
 export interface ReviewStats {
   count: number

@@ -4,6 +4,7 @@ import { Eye, EyeOff, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import type { DeliveryZone } from '../../lib/types'
+import { parseLatLon } from '../../lib/coordinates'
 import DistancePricingPanel from './DistancePricingPanel'
 
 const inputClass =
@@ -17,21 +18,33 @@ function friendly(err: { code?: string; message: string }) {
 function ZoneCard({ zone, onChanged }: { zone: DeliveryZone; onChanged: () => void }) {
   const [name, setName] = useState(zone.name)
   const [fee, setFee] = useState(String(zone.fee))
+  const savedLoc = zone.latitude != null && zone.longitude != null ? `${zone.latitude}, ${zone.longitude}` : ''
+  const [loc, setLoc] = useState(savedLoc)
   const [busy, setBusy] = useState(false)
 
   const isHome = zone.kind === 'home'
   // Home delivery is priced by distance, so it has no flat fee to edit.
-  const changed = name.trim() !== zone.name || (!isHome && Number(fee) !== Number(zone.fee))
+  const changed = name.trim() !== zone.name || (!isHome && (Number(fee) !== Number(zone.fee) || loc.trim() !== savedLoc))
 
   async function save() {
     const feeNumber = Number(fee)
     if (!name.trim()) return toast.error('Please enter a name.')
     if (!isHome && (fee === '' || Number.isNaN(feeNumber) || feeNumber < 0)) return toast.error('Enter a valid fee (0 or more).')
 
+    let point: { lat: number; lon: number } | null = null
+    if (!isHome && loc.trim()) {
+      point = parseLatLon(loc)
+      if (!point) return toast.error('Location not understood. Paste it like 4.9009, 6.9063 or 4°54\'03.3"N 6°54\'22.7"E.')
+    }
+
     setBusy(true)
     const { error } = await supabase
       .from('delivery_zones')
-      .update(isHome ? { name: name.trim() } : { name: name.trim(), fee: feeNumber })
+      .update(
+        isHome
+          ? { name: name.trim() }
+          : { name: name.trim(), fee: feeNumber, latitude: point?.lat ?? null, longitude: point?.lon ?? null }
+      )
       .eq('id', zone.id)
     setBusy(false)
     if (error) return toast.error(friendly(error))
@@ -66,6 +79,17 @@ function ZoneCard({ zone, onChanged }: { zone: DeliveryZone; onChanged: () => vo
           </div>
         )}
       </div>
+      {!isHome && (
+        <div className="mt-3">
+          <label className="mb-1 block text-xs font-medium text-gray-500">Delivery location (latitude, longitude)</label>
+          <input
+            className={inputClass}
+            placeholder={`4.9009, 6.9063  or  4°54'03.3"N 6°54'22.7"E`}
+            value={loc}
+            onChange={(e) => setLoc(e.target.value)}
+          />
+        </div>
+      )}
       {isHome && <p className="mt-2 text-xs text-gray-500">The fee is worked out from the distance (see pricing above).</p>}
 
       <div className="mt-3 flex items-center justify-between">
@@ -93,6 +117,7 @@ export default function AdminDelivery() {
   const queryClient = useQueryClient()
   const [newName, setNewName] = useState('')
   const [newFee, setNewFee] = useState('')
+  const [newLoc, setNewLoc] = useState('')
   const [adding, setAdding] = useState(false)
 
   const { data: zones, isLoading, error } = useQuery({
@@ -116,17 +141,24 @@ export default function AdminDelivery() {
     if (!newName.trim()) return toast.error('Please enter a name.')
     if (newFee === '' || Number.isNaN(feeNumber) || feeNumber < 0) return toast.error('Enter a valid fee (0 or more).')
 
+    let point: { lat: number; lon: number } | null = null
+    if (newLoc.trim()) {
+      point = parseLatLon(newLoc)
+      if (!point) return toast.error('Location not understood. Paste it like 4.9009, 6.9063 or 4°54\'03.3"N 6°54\'22.7"E.')
+    }
+
     setAdding(true)
     const nextOrder = Math.max(0, ...(zones ?? []).map((z) => z.sort_order)) + 1
     const { error } = await supabase
       .from('delivery_zones')
-      .insert({ name: newName.trim(), fee: feeNumber, kind: 'campus', sort_order: nextOrder })
+      .insert({ name: newName.trim(), fee: feeNumber, kind: 'campus', sort_order: nextOrder, latitude: point?.lat ?? null, longitude: point?.lon ?? null })
     setAdding(false)
     if (error) return toast.error(friendly(error))
 
     toast.success('Campus added')
     setNewName('')
     setNewFee('')
+    setNewLoc('')
     refresh()
   }
 
@@ -158,6 +190,12 @@ export default function AdminDelivery() {
           <input className={inputClass} placeholder="Campus name" value={newName} onChange={(e) => setNewName(e.target.value)} />
           <input className={inputClass} placeholder="Fee (₦)" inputMode="decimal" value={newFee} onChange={(e) => setNewFee(e.target.value)} />
         </div>
+        <input
+          className={`${inputClass} mt-3`}
+          placeholder={`Location (optional): 4.9009, 6.9063  or  4°54'03.3"N 6°54'22.7"E`}
+          value={newLoc}
+          onChange={(e) => setNewLoc(e.target.value)}
+        />
         <button
           onClick={addCampus}
           disabled={adding}

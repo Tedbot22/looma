@@ -4,7 +4,7 @@ import { ArrowLeft, X } from 'lucide-react'
 import { Stars } from '../components/StarRating'
 import ReviewCard from '../components/ReviewCard'
 import { ListSkeleton, Skeleton } from '../components/Skeleton'
-import { useReviewStats, useStoreReviews, type ReviewSort } from '../hooks/useReviews'
+import { useReviewProducts, useReviewStats, useStoreReviews, type ReviewSort } from '../hooks/useReviews'
 import { REVIEW_QUESTIONS, type ReviewStats, type Tone } from '../lib/reviews'
 
 const PAGE_SIZE = 10
@@ -113,6 +113,7 @@ export default function Reviews() {
 
   const shown = reviews.data?.slice(0, visible) ?? []
   const filtered = rating !== null || withComments
+  const { data: productsByReview } = useReviewProducts(shown.map((r) => r.id))
 
   function resetPaging<T>(setter: (v: T) => void) {
     return (v: T) => {
@@ -200,7 +201,7 @@ export default function Reviews() {
               </p>
             )}
             {shown.map((r) => (
-              <ReviewCard key={r.id} review={r} />
+              <ReviewCard key={r.id} review={r} products={productsByReview?.[r.id]} />
             ))}
           </div>
 

@@ -1,9 +1,10 @@
+import { Link } from 'react-router-dom'
 import { BadgeCheck } from 'lucide-react'
 import { Stars } from '../components/StarRating'
-import { REVIEW_QUESTIONS, optionLabel, type PublicReview } from '../lib/reviews'
+import { REVIEW_QUESTIONS, optionLabel, type PublicReview, type ReviewProduct } from '../lib/reviews'
 
 // One customer review: stars, who and when, what they said about the quick questions, and their message.
-export default function ReviewCard({ review }: { review: PublicReview }) {
+export default function ReviewCard({ review, products }: { review: PublicReview; products?: ReviewProduct[] }) {
   const answers = REVIEW_QUESTIONS.flatMap((q) => {
     const label = optionLabel(q.key, review[q.key])
     return label ? [{ key: q.key, short: q.short, label }] : []
@@ -24,6 +25,20 @@ export default function ReviewCard({ review }: { review: PublicReview }) {
           <BadgeCheck size={14} /> Verified purchase
         </span>
       </p>
+
+      {products && products.length > 0 && (
+        <p className="mt-1 text-xs text-gray-500">
+          Bought:{' '}
+          {products.map((p, i) => (
+            <span key={p.product_id}>
+              {i > 0 && ', '}
+              <Link to={`/product/${p.product_id}`} className="font-medium text-brand underline">
+                {p.product_name}
+              </Link>
+            </span>
+          ))}
+        </p>
+      )}
 
       {review.message && <p className="mt-3 whitespace-pre-line break-words text-sm leading-relaxed text-gray-700">{review.message}</p>}
 

@@ -288,6 +288,17 @@ export default function AdminOrders() {
                     </a>
                   )}
 
+                {order.delivery_lat != null && order.delivery_lon != null && (order.origin_lat == null || order.origin_lon == null) && (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${order.delivery_lat},${order.delivery_lon}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:border-brand"
+                  >
+                    <MapPin size={15} /> View location
+                  </a>
+                )}
+
                 {order.status === 'placed' && (
                   <button
                     disabled={updateStatus.isPending}

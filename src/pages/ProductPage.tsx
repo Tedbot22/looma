@@ -14,6 +14,7 @@ import ImageCarousel from '../components/ImageCarousel'
 import ProductDetails from '../components/ProductDetails'
 import YouMayAlsoLike from '../components/YouMayAlsoLike'
 import StoreReviewsLink from '../components/StoreReviewsLink'
+import ProductReviews from '../components/ProductReviews'
 import { ProductPageSkeleton } from '../components/Skeleton'
 import type { ProductVariant, ProductWithVariants } from '../lib/types'
 
@@ -257,6 +258,8 @@ export default function ProductPage() {
       </div>
 
       <ProductDetails product={product} />
+
+      <ProductReviews productId={product.id} />
 
       <StoreReviewsLink />
 

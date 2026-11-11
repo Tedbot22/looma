@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import type { PublicReview, ReviewStats } from '../lib/reviews'
+import type { PublicReview, ReviewProduct, ReviewStats } from '../lib/reviews'
 
 // Totals for the summary and the product page link. Counted in the database; cached for a few minutes.
 export function useReviewStats() {
@@ -42,6 +42,52 @@ export function useStoreReviews(filters: ReviewFilters) {
       const { data, error } = await query
       if (error) throw error
       return data as PublicReview[]
+    },
+  })
+}
+
+// Reviews linked to one product (customers who bought it), newest first, plus its average and count.
+export function useProductReviews(productId: string | undefined) {
+  return useQuery({
+    queryKey: ['product-reviews', productId],
+    enabled: !!productId,
+    staleTime: 60_000,
+    queryFn: async (): Promise<{ reviews: PublicReview[]; count: number; average: number }> => {
+      const [list, stats] = await Promise.all([
+        supabase
+          .from('public_product_reviews')
+          .select('*')
+          .eq('product_id', productId!)
+          .order('created_at', { ascending: false })
+          .limit(20),
+        supabase.from('product_review_stats').select('count, average').eq('product_id', productId!).maybeSingle(),
+      ])
+      if (list.error) throw list.error
+      if (stats.error) throw stats.error
+      return {
+        reviews: list.data as PublicReview[],
+        count: Number(stats.data?.count ?? 0),
+        average: Number(stats.data?.average ?? 0),
+      }
+    },
+  })
+}
+
+// The products each of these reviews is linked to, keyed by review id (for the "Bought:" line on review cards).
+export function useReviewProducts(reviewIds: string[]) {
+  return useQuery({
+    queryKey: ['review-products', reviewIds.join(',')],
+    enabled: reviewIds.length > 0,
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<Record<string, ReviewProduct[]>> => {
+      const { data, error } = await supabase
+        .from('public_review_products')
+        .select('review_id, product_id, product_name')
+        .in('review_id', reviewIds)
+      if (error) throw error
+      const byReview: Record<string, ReviewProduct[]> = {}
+      for (const row of (data ?? []) as ReviewProduct[]) (byReview[row.review_id] ??= []).push(row)
+      return byReview
     },
   })
 }

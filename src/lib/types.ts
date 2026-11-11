@@ -93,6 +93,8 @@ export interface DeliveryZone {
   is_active: boolean
   sort_order: number
   kind: 'campus' | 'home' // campus = ready-made option; home = customer enters an address
+  latitude?: number | null // where a campus delivery goes (campus options only)
+  longitude?: number | null
 }
 
 // A customer's saved delivery location: a campus plus their own details (hostel, room, landmark).

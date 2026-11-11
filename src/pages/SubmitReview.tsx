@@ -124,7 +124,7 @@ export default function SubmitReview() {
     }
 
     // Refresh everything that shows reviews, so the new one appears and the prompt goes away.
-    for (const key of ['review-stats', 'store-reviews', 'my-reviewed-orders', 'my-review', 'admin-reviews']) {
+    for (const key of ['review-stats', 'store-reviews', 'product-reviews', 'review-products', 'my-reviewed-orders', 'my-review', 'admin-reviews']) {
       queryClient.invalidateQueries({ queryKey: [key] })
     }
     setDone(true)
@@ -141,6 +141,8 @@ export default function SubmitReview() {
         Order #{order.order_number}
         {itemNames.length > 0 && ` · ${itemNames.slice(0, 2).join(', ')}${itemNames.length > 2 ? ` +${itemNames.length - 2} more` : ''}`}
       </p>
+
+      <p className="mt-1 text-xs text-gray-500">Your review will also appear on the product pages of the items in this order.</p>
 
       <div className="mt-5">
         <StarPicker value={rating} onChange={setRating} size={40} showLabel />
