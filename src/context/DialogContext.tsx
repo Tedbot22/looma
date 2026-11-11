@@ -53,6 +53,7 @@ type Request =
   | ({ kind: 'prompt'; id: number; resolve: (v: string | null) => void } & PromptOptions)
 
 const DialogContext = createContext<DialogApi | null>(null)
+const DIALOG_MARK = '__loomaDialog'
 
 export function DialogProvider({ children }: { children: ReactNode }) {
   const [queue, setQueue] = useState<Request[]>([])
@@ -78,6 +79,53 @@ export function DialogProvider({ children }: { children: ReactNode }) {
 
   const api = useMemo(() => ({ confirm, prompt }), [confirm, prompt])
   const current = queue[0]
+
+  // The device back button should close the dialog (like Cancel) instead of leaving the page.
+  // While a dialog is open we add one history entry; Back removes it and we treat that as a cancel.
+  const queueRef = useRef(queue)
+  useEffect(() => {
+    queueRef.current = queue
+  }, [queue])
+  const ignorePops = useRef(0) // popstates caused by our own history.back() when a dialog closes normally
+  const open = queue.length > 0
+
+  useEffect(() => {
+    if (!open) return
+    const ignore = ignorePops
+    let pushed = false
+    // Deferred a tick so React StrictMode's mount/unmount/mount in dev doesn't push and pop twice.
+    const timer = setTimeout(() => {
+      window.history.pushState({ ...(window.history.state ?? {}), [DIALOG_MARK]: true }, '')
+      pushed = true
+    }, 0)
+
+    const onPop = () => {
+      if (ignore.current > 0) {
+        ignore.current--
+        return
+      }
+      const [first, ...rest] = queueRef.current
+      if (!first) return
+      if (first.kind === 'confirm') first.resolve(false)
+      else first.resolve(null)
+      setQueue(rest)
+      // Another dialog is waiting, so it needs its own entry for Back to remove.
+      if (rest.length > 0) {
+        window.history.pushState({ ...(window.history.state ?? {}), [DIALOG_MARK]: true }, '')
+      }
+    }
+    window.addEventListener('popstate', onPop)
+
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('popstate', onPop)
+      // Closed with a button, so remove the extra entry (unless Back already did).
+      if (pushed && window.history.state?.[DIALOG_MARK]) {
+        ignore.current++
+        window.history.back()
+      }
+    }
+  }, [open])
 
   // Stop the page behind the dialog from scrolling while it's open.
   useEffect(() => {
@@ -179,7 +227,7 @@ function DialogView({ request, onDone }: { request: Request; onDone: (value: boo
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
       onMouseDown={(e) => e.target === e.currentTarget && cancel()}
       onKeyDown={onKeyDown}
     >
@@ -189,7 +237,7 @@ function DialogView({ request, onDone }: { request: Request; onDone: (value: boo
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={request.message ? messageId : undefined}
-        className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl"
+        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
       >
         <div className="flex items-start gap-3">
           {danger && (
