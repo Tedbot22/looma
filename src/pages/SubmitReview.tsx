@@ -10,7 +10,7 @@ import { StarPicker } from '../components/StarRating'
 import ReviewMediaPicker from '../components/ReviewMediaPicker'
 import { removeUploaded, uploadReviewMedia, type PendingMedia } from '../lib/reviewMedia'
 import { OrderSkeleton } from '../components/Skeleton'
-import { MAX_MESSAGE_LENGTH, RATING_LABEL, REVIEW_QUESTIONS, type ReviewQuestionKey } from '../lib/reviews'
+import { MAX_MESSAGE_LENGTH, REVIEW_QUESTIONS, type ReviewQuestionKey } from '../lib/reviews'
 
 interface OrderToReview {
   id: string
