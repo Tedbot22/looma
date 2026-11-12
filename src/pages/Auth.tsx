@@ -97,7 +97,7 @@ export default function Auth({ mode }: { mode: 'login' | 'signup' }) {
     <div className="mx-auto max-w-sm py-8">
       <h1 className="text-2xl font-bold">{isSignup ? 'Create your account' : 'Welcome back'}</h1>
       <p className="mt-1 text-sm text-gray-500">
-        {isSignup ? 'Sign up to place orders and earn rewards.' : 'Log in to continue.'}
+        {isSignup ? 'Sign up to place orders.' : 'Log in to continue.'}
       </p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-3">
@@ -132,7 +132,7 @@ export default function Auth({ mode }: { mode: 'login' | 'signup' }) {
         />
         <input
           className={inputClass}
-          placeholder="Password (min. 6 characters)"
+          placeholder="Password"
           type="password"
           autoComplete={isSignup ? 'new-password' : 'current-password'}
           minLength={6}
