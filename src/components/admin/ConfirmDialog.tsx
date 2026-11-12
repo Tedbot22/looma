@@ -12,13 +12,13 @@ interface Props {
 
 export default function ConfirmDialog({ title, children, confirmLabel, busy, danger, onConfirm, onCancel }: Props) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={onCancel}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onCancel}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-t-2xl bg-white p-5 sm:rounded-2xl"
+        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
       >
         <h2 className="text-lg font-semibold">{title}</h2>
         <div className="mt-2 text-sm text-gray-600">{children}</div>

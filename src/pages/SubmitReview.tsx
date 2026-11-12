@@ -253,7 +253,7 @@ export default function SubmitReview() {
               disabled={submitting}
               className="w-full rounded-lg bg-brand py-3 font-semibold text-white hover:bg-brand-light disabled:opacity-60"
             >
-              {submitting ? progress || 'Sending…' : `Submit ${RATING_LABEL[rating].toLowerCase()} review`}
+              {submitting ? progress || 'Sending…' : `Submit review`}
             </button>
             <p className="mt-3 text-center text-xs text-gray-500">
               Not now?{' '}

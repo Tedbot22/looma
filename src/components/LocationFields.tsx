@@ -28,9 +28,9 @@ export default function LocationFields({ text, place, note, bias, onTextChange, 
           placeholder="e.g Ada George Road, Port-Harcourt"
         />
         {text.trim().length > 0 && !place ? (
-          <p className="hidden mt-1 text-xs text-amber-600">Pick your address from the suggestions so we can find it on the map.</p>
+          <p className="hidden mt-1 text-xs text-amber-600">Select your address from the suggestions.</p>
         ) : (
-          <p className="hidden mt-1 text-xs text-gray-400 ">Start typing, then choose your address from the list.</p>
+          <p className="hidden mt-1 text-xs text-gray-400 ">Start typing and select your address from the suggestions.</p>
         )}
       </div>
 
@@ -42,7 +42,7 @@ export default function LocationFields({ text, place, note, bias, onTextChange, 
           className={inputClass}
           value={note}
           maxLength={300}
-          placeholder="e.g. Blue gate, second floor, call when you arrive"
+          placeholder="e.g. Blue gate, second floor"
           onChange={(e) => onNoteChange(e.target.value)}
         />
       </div>

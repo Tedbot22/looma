@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { useProfile } from '../../hooks/useProfile'
 import AddressBook from '../../components/AddressBook'
-import ConfirmDialog from '../../components/ConfirmDialog'
+import { useDialog } from '../../context/DialogContext'
 
 const inputClass =
   'w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand'
@@ -14,6 +14,7 @@ const inputClass =
 export default function EditProfile() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const dialog = useDialog()
   const { data: profile } = useProfile()
   const queryClient = useQueryClient()
 
@@ -21,7 +22,6 @@ export default function EditProfile() {
   const [nameInput, setNameInput] = useState<string | null>(null)
   const [phoneInput, setPhoneInput] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [confirmDeactivate, setConfirmDeactivate] = useState(false)
   const [deactivating, setDeactivating] = useState(false)
 
   if (!profile || !user) return <p className="py-20 text-center text-gray-400">Loading…</p>
@@ -56,11 +56,19 @@ export default function EditProfile() {
   }
 
   async function deactivate() {
+    const ok = await dialog.confirm({
+      title: 'Deactivate your account?',
+      message:
+        "You’ll be logged out of all devices and won’t be able to log in or place orders until the store reactivates your account..",
+      confirmLabel: 'Deactivate',
+      danger: true,
+    })
+    if (!ok) return
+
     setDeactivating(true)
     const { error } = await supabase.rpc('deactivate_my_account')
     if (error) {
       setDeactivating(false)
-      setConfirmDeactivate(false)
       toast.error(
         error.message.includes('ACTIVE_ORDERS')
           ? "You have an order in progress. You can deactivate once it's delivered or cancelled."
@@ -123,25 +131,14 @@ export default function EditProfile() {
         </p>
         <button
           type="button"
-          onClick={() => setConfirmDeactivate(true)}
-          className="mt-3 rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+          onClick={deactivate}
+          disabled={deactivating}
+          className="mt-3 rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
         >
-          Deactivate my account
+          {deactivating ? 'Working…' : 'Deactivate my account'}
         </button>
       </section>
 
-      <ConfirmDialog
-        open={confirmDeactivate}
-        title="Deactivate your account?"
-        confirmLabel="Deactivate"
-        danger
-        busy={deactivating}
-        onConfirm={deactivate}
-        onCancel={() => setConfirmDeactivate(false)}
-      >
-        You'll be logged out on all your devices and won't be able to log in or place orders until the store reactivates your
-        account.
-      </ConfirmDialog>
     </div>
   )
 }

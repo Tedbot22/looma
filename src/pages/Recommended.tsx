@@ -56,7 +56,7 @@ function LikeThis({ product }: { product: ProductWithVariants }) {
       back={{ to: `/product/${product.id}`, label: 'Back' }}
     >
       {isLoading && <ProductGridSkeleton count={10} />}
-      {!isLoading && items.length === 0 && <p className="text-gray-500">Nothing similar in stock right now. Check back soon!</p>}
+      {!isLoading && items.length === 0 && <p className="text-gray-500">Nothing here right now. Check back soon!</p>}
       <div className={GRID}>
         {items.map((p) => (
           <ProductCard key={p.id} product={p} />

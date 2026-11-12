@@ -67,7 +67,7 @@ export default function DeliveryQr({ orderId }: { orderId: string }) {
   useEffect(() => {
     if (!shown) return
     if (expired || delivery?.qr_verified || (delivery && !delivery.active)) setShown(null)
-    if (expired) setError('That code has expired. Tap the button for a new one.')
+    if (expired) setError('Code has expired. Request for a new one.')
   }, [shown, expired, delivery])
 
   // Once the delivery is finished, refresh the order so the page shows "Delivered".
@@ -121,7 +121,7 @@ export default function DeliveryQr({ orderId }: { orderId: string }) {
         <div role="status" className="mt-4 flex gap-3 rounded-lg bg-white p-3 text-sm text-green-800">
           <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-green-600" />
           <p>
-            <span className="font-semibold">Your code was accepted.</span> The rider is finishing the delivery now.
+            <span className="font-semibold">Your code has been verified.</span> The rider is completing your delivery now.
           </p>
         </div>
       ) : shown ? (
@@ -132,7 +132,7 @@ export default function DeliveryQr({ orderId }: { orderId: string }) {
           <p className="mt-2 text-sm font-medium tabular-nums">
             Expires in {mins}:{secs}
           </p>
-          <p className="mt-1 text-xs text-gray-600">Turn your screen brightness up and let the rider scan this code.</p>
+          <p className="mt-1 text-xs text-gray-600">Present this QR code to the delivery rider for scanning and verification.</p>
         </div>
       ) : (
         <div className="mt-4">

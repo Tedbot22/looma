@@ -181,7 +181,7 @@ export default function RiderDeliveryPage() {
         setOtp('')
         setOtpOpen(false)
         setOtpSent(null)
-        setNotice("Customer's code accepted. Now tap Confirm delivery.")
+        setNotice("Customer's code verified. Now tap Confirm delivery.")
         await load(true)
       }
     )
@@ -389,12 +389,12 @@ export default function RiderDeliveryPage() {
             <p className="flex items-start gap-2 text-xs text-gray-500">
               <Clock size={14} className="mt-0.5 shrink-0" />
               Ask the customer to open this order in their {STORE_NAME} account and tap "Show Delivery QR". Do not hand
-              over the order until the scan is accepted.
+              over the order until the scan is verified.
             </p>
 
             {!otpOpen ? (
               <button onClick={() => (setProblem(null), setOtpOpen(true))} className="w-full py-1 text-sm font-medium text-brand underline">
-                Customer can't show the QR? Text them a 6-digit code
+                Customer can't show the QR? Request a 6-digit code
               </button>
             ) : (
               <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
@@ -403,15 +403,14 @@ export default function RiderDeliveryPage() {
                 {!otpSent ? (
                   <>
                     <p className="text-xs text-gray-500">
-                      We'll text a code to the phone number on this order. The customer reads it out to you. You won't see
-                      it until they tell you.
+                      We'll send an OTP to the phone number on this order. The customer will read it out to you.
                     </p>
                     <button
                       disabled={busy}
                       onClick={sendOtp}
                       className="w-full rounded-lg bg-brand px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
                     >
-                      {busy ? 'Sending…' : "Text the customer a code"}
+                      {busy ? 'Sending…' : "Send the customer an OTP"}
                     </button>
                   </>
                 ) : (

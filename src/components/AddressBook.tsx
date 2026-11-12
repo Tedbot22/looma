@@ -119,7 +119,7 @@ export default function AddressBook() {
       </ul>
 
       {!homeZone ? (
-        <p className="mt-3 text-sm text-gray-500">Home delivery isn't available right now, so addresses can't be added.</p>
+        <p className="mt-3 text-sm text-gray-500">Home delivery isn't available right now.</p>
       ) : editing === 'new' ? (
         <div className="mt-3">
           <AddressForm zone={homeZone} submitLabel="Save address" onSubmit={save} onCancel={() => setEditing(null)} />

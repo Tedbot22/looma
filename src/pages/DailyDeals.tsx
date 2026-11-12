@@ -18,7 +18,7 @@ export default function DailyDeals() {
         <ArrowLeft size={16} /> Home
       </Link>
       <h1 className="text-2xl font-bold">Daily deals</h1>
-      <p className="mb-6 mt-1 text-sm text-gray-500">Fresh arrivals first, then a daily mix of newer and older finds.</p>
+      <p className="mb-6 mt-1 text-sm text-gray-500"> </p>
 
       {pool.isLoading && <ProductGridSkeleton count={10} />}
       {pool.error && <p className="text-red-600">Couldn't load the deals.</p>}

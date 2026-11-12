@@ -33,7 +33,7 @@ export default function QuickAddDialog({ product, variants, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
+      className="fixed inset-0 z-50 flex overflow-y-auto bg-black/40 p-4"
       onClick={onClose}
       role="presentation"
     >
@@ -42,7 +42,7 @@ export default function QuickAddDialog({ product, variants, onClose }: Props) {
         aria-modal="true"
         aria-label={`Choose an option for ${product.name}`}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-t-2xl bg-white p-5 sm:rounded-2xl"
+        className="m-auto w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
       >
         <div className="flex items-start justify-between gap-3">
           <div>

@@ -88,17 +88,17 @@ export default function HomeDeliveryDialog({ zone, onSave, onCancel }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+    <div className="fixed inset-0 z-50 flex overflow-y-auto bg-black/40 p-4">
       <form
         onSubmit={handleSubmit}
         role="dialog"
         aria-modal="true"
         aria-label="Home delivery address"
-        className="w-full max-w-sm rounded-t-2xl bg-white p-5 sm:rounded-2xl"
+        className="m-auto w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
       >
         <h2 className="text-lg font-semibold">Home delivery</h2>
         <p className="mb-4 mt-1 text-sm text-gray-500">
-          Enter address where we should deliver
+          Enter your delivery address.
         </p>
 
         <LocationFields
