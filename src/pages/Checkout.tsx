@@ -116,7 +116,7 @@ export default function Checkout() {
   if (redirecting) {
     return (
       <div className="py-20 text-center text-gray-500">
-        <p>Taking you to Paystack…</p>
+        <p>Redirecting you to Paystack…</p>
         <p className="mt-1 text-xs text-gray-400">Please don't close this page.</p>
       </div>
     )
