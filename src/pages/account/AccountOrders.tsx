@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { ListSkeleton } from '../../components/Skeleton'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
@@ -37,6 +37,22 @@ const PAGES: { key: string; label: string; empty: string; statuses: Order['statu
   { key: 'cancelled', label: 'Cancelled', empty: 'No cancelled orders.', statuses: ['cancelled'] },
 ]
 
+const PAGE_STORAGE_KEY = 'account-orders-page'
+
+// Which page to open on: the one in the address (?tab=...), else the last one used in this browser session,
+// else the first. Keeping it there means coming back from an order returns to the same page.
+function readPage(param: string | null): number {
+  const fromParam = PAGES.findIndex((p) => p.key === param)
+  if (fromParam >= 0) return fromParam
+  try {
+    const fromStorage = PAGES.findIndex((p) => p.key === sessionStorage.getItem(PAGE_STORAGE_KEY))
+    if (fromStorage >= 0) return fromStorage
+  } catch {
+    // storage can be unavailable (private mode): fall through to the first page
+  }
+  return 0
+}
+
 export default function AccountOrders() {
   const { user } = useAuth()
   const { data: reviewedIds } = useMyReviewedOrderIds()
@@ -44,7 +60,18 @@ export default function AccountOrders() {
   // The viewpager: swipe sideways (or tap a tab) to move between pages.
   const pager = useRef<HTMLDivElement>(null)
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
-  const [page, setPage] = useState(0)
+  const [params, setParams] = useSearchParams()
+  const [page, setPage] = useState(() => readPage(params.get('tab')))
+
+  // Remember the page, in the address and for the session (replace, so Back leaves instead of stepping through pages).
+  function remember(i: number) {
+    try {
+      sessionStorage.setItem(PAGE_STORAGE_KEY, PAGES[i].key)
+    } catch {
+      // not fatal: the address still remembers it
+    }
+    setParams({ tab: PAGES[i].key }, { replace: true })
+  }
 
   function goTo(i: number) {
     const el = pager.current
@@ -55,7 +82,11 @@ export default function AccountOrders() {
   function handleScroll() {
     const el = pager.current
     if (!el || el.clientWidth === 0) return
-    setPage(Math.round(el.scrollLeft / el.clientWidth))
+    const next = Math.round(el.scrollLeft / el.clientWidth)
+    if (next !== page) {
+      setPage(next)
+      remember(next)
+    }
   }
 
   // Keep the active tab visible when the tab row itself is scrolled (small phones).
@@ -77,6 +108,15 @@ export default function AccountOrders() {
     },
     enabled: !!user,
   })
+
+  // The pager only exists once the orders have loaded: jump (without animating) to the remembered page then.
+  const hasOrders = (orders?.length ?? 0) > 0
+  useLayoutEffect(() => {
+    const el = pager.current
+    if (hasOrders && el) el.scrollTo({ left: page * el.clientWidth, behavior: 'auto' })
+    // only when the pager first appears; later page changes come from the person swiping or tapping
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasOrders])
 
   const inPage = (statuses: Order['status'][]) => (orders ?? []).filter((o) => statuses.includes(o.status))
 
