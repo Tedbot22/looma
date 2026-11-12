@@ -24,7 +24,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 // They hide the footer and the header search so people stay on the task.
 // To hide them somewhere else, add the path start here. To bring them back, remove it.
 const FOCUSED_PREFIXES = ['/login', '/signup', '/checkout', '/order', '/reviews', '/account', '/about', '/faq', '/privacy', '/terms', '/contact', '/shop', '/product', '/cart',]
-const FOOTER_PAGES = ['/', '/shop', '/product', '/cart', '/about', '/faq', '/privacy', '/terms', '/contact', '/daily-deals', '/recommended', '/recently-viewed', '/reviews', '/wishlist']
+const FOOTER_PAGES = ['/', '/shop', '/product', '/cart', '/about', '/faq', '/privacy', '/terms', '/contact', '/todays-deals', '/recommended', '/recently-viewed', '/reviews', '/wishlist']
 
 const matches = (pathname: string, base: string) =>
   base === '/' ? pathname === '/' : pathname === base || pathname.startsWith(base + '/')

@@ -68,3 +68,16 @@ body {
     animation: none;
   }
 }
+
+/* The fill inside the active progress bar of the home banner (SLIDE_MS in HeroCarousel.tsx). */
+@keyframes hero-progress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+.hero-progress {
+  animation: hero-progress 5.5s linear forwards;
+}

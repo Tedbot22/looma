@@ -9,7 +9,7 @@ import HeroCarousel, { type Banner } from '../components/HeroCarousel'
 import ProductCard from '../components/ProductCard'
 import { CategoryRowSkeleton, HeroSkeleton, ProductCardSkeleton } from '../components/Skeleton'
 import type { Category, ProductWithVariants } from '../lib/types'
-import { dailyDealsList } from '../lib/dailyDeals'
+import { todaysDealsList } from '../lib/todaysDeals'
 import { STORE_NAME } from '../config'
 import { FULL_BLEED } from '../lib/layout'
 
@@ -102,8 +102,8 @@ export default function Home() {
   const recent = useRecentlyViewedProducts(ROW_MAX)
   const recommended = useRecommendations(ROW_MAX * 2)
 
-  // Daily deals: the freshest items (and markdowns) first. Always the top row.
-  const deals = useMemo(() => (pool.data ? dailyDealsList(pool.data).slice(0, ROW_MAX) : []), [pool.data])
+  // Today's deals: a mix of fresh arrivals, big markdowns and random picks. Always the top row.
+  const deals = useMemo(() => (pool.data ? todaysDealsList(pool.data).slice(0, ROW_MAX) : []), [pool.data])
   const dealIds = new Set(deals.map((p) => p.id))
 
   // Recommended for you: personal picks once the customer has interacted with items, random items before
@@ -136,9 +136,9 @@ export default function Home() {
 
       {bannersLoading ? <HeroSkeleton /> : banners && banners.length > 0 ? <HeroCarousel banners={banners} /> : null}
 
-      {/* Daily deals always sit above Recently viewed and Recommended. */}
+      {/* Today's deals always sit above Recently viewed and Recommended. */}
       {(pool.isLoading || deals.length > 0) && (
-        <Section title="Daily deals" subtitle="Fresh arrivals and a daily mix of finds" to="/daily-deals">
+        <Section title="Today's deals" subtitle=" " to="/todays-deals">
           {pool.isLoading ? <RowSkeleton /> : <Products items={deals} />}
         </Section>
       )}
@@ -150,15 +150,12 @@ export default function Home() {
         </Section>
       )}
 
-      <Section title="Recommended for you" to="/recommended">
-        {recommended.isLoading ? (
-          <RowSkeleton />
-        ) : picks.length === 0 ? (
-          <p className="text-gray-500">Nothing to recommend right now. Check back soon!</p>
-        ) : (
+      {/* Hidden when there is nothing to recommend (and while it is still loading, so it never flashes in and out). */}
+      {!recommended.isLoading && picks.length > 0 && (
+        <Section title="Recommended for you" to="/recommended">
           <Products items={picks} />
-        )}
-      </Section>
+        </Section>
+      )}
     </div>
   )
 }

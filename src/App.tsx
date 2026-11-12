@@ -18,7 +18,7 @@ const Checkout = lazy(() => import('./pages/Checkout'))
 const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation'))
 const ContentPage = lazy(() => import('./pages/ContentPage'))
 const Contact = lazy(() => import('./pages/Contact'))
-const DailyDeals = lazy(() => import('./pages/DailyDeals'))
+const TodaysDeals = lazy(() => import('./pages/TodaysDeals'))
 const Recommended = lazy(() => import('./pages/Recommended'))
 const Reviews = lazy(() => import('./pages/Reviews'))
 const SubmitReview = lazy(() => import('./pages/SubmitReview'))
@@ -104,7 +104,7 @@ export default function App() {
           <Route path="/contact" element={<Contact />} />
 
           {/* The full lists behind the home page's "View all" buttons (open to everyone) */}
-          <Route path="/daily-deals" element={<DailyDeals />} />
+          <Route path="/todays-deals" element={<TodaysDeals />} />
           <Route path="/recommended" element={<Recommended />} />
           <Route path="/recently-viewed" element={<RecentlyViewed />} />
 

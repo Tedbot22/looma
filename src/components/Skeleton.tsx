@@ -176,7 +176,7 @@ export function OrderSkeleton() {
 export function HeroSkeleton() {
   return (
     <Busy label="Loading" className="mb-10">
-      <Skeleton className="aspect-[16/9] max-h-[620px] w-full rounded-2xl sm:aspect-[21/9]" />
+      <Skeleton className="aspect-[16/10] max-h-[560px] w-full rounded-2xl sm:aspect-[21/9] sm:rounded-3xl" />
     </Busy>
   )
 }

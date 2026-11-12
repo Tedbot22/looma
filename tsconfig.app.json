@@ -22,5 +22,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "../vite.config.ts", "../useDeliveryZones.ts", "src/App.tsx", "src/pages/OrderConfirmation.tsx", "../Claude/files/Checkout.tsx", "../Claude/files0/OrderConfirmation.tsx", "supabase/functions/_shared/paystack.ts", "../Claude/customer-reviews/src/hooks/useReviews.ts", "src/pages/Home.tsx"]
+  "include": ["src", "../vite.config.ts", "../useDeliveryZones.ts", "src/App.tsx", "src/pages/OrderConfirmation.tsx", "../Claude/files/Checkout.tsx", "../Claude/files0/OrderConfirmation.tsx", "supabase/functions/_shared/paystack.ts", "../Claude/customer-reviews/src/hooks/useReviews.ts", "src/pages/Home.tsx", "src/pages/TodaysDeals.tsx"]
 }
