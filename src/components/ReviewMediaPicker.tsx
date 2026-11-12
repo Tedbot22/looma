@@ -66,7 +66,7 @@ export default function ReviewMediaPicker({
     <section>
       <h2 className="font-semibold">Add photos or a video</h2>
       <p className="text-xs text-gray-500">
-        Optional. Show how it fits: up to {MAX_REVIEW_PHOTOS} photos and {MAX_REVIEW_VIDEOS} video ({MAX_VIDEO_SECONDS} seconds, {MAX_VIDEO_MB} MB).
+       Up to {MAX_REVIEW_PHOTOS} photos and {MAX_REVIEW_VIDEOS} video ({MAX_VIDEO_SECONDS} seconds, {MAX_VIDEO_MB} MB).
       </p>
 
       {items.length > 0 && (

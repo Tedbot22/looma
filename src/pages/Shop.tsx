@@ -156,7 +156,7 @@ export default function Shop() {
   return (
     <div>
       <div className="mb-5 flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">{term ? `Results for “${q.trim()}”` : (category?.name ?? 'Shop')}</h1>
+        <h1 className="text-2xl font-bold">{term ? `Results for “${q.trim()}”` : (category?.name ?? 'All ')}</h1>
 
         <button
           type="button"

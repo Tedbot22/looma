@@ -87,7 +87,7 @@ export default function Vouchers() {
           <p className="mt-3 font-medium">{tab === 'active' ? 'No vouchers right now' : 'Nothing here yet'}</p>
           <p className="mx-auto mt-1 max-w-xs text-sm text-gray-500">
             {tab === 'active'
-              ? 'Invite friends to earn a surprise voucher. Each one is valid for 30 days.'
+              ? 'Invite friends to earn a voucher. Each one is valid for 30 days.'
               : 'Vouchers you have used or that have expired will show up here.'}
           </p>
           {tab === 'active' && (

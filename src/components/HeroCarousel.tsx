@@ -61,14 +61,14 @@ export default function HeroCarousel({ banners }: { banners: Banner[] }) {
       <div
         ref={scroller}
         onScroll={handleScroll}
-        className="flex aspect-[16/10] max-h-[560px] w-full snap-x snap-mandatory overflow-x-auto sm:aspect-[21/9] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex aspect-[16/9] max-h-[380px] w-full snap-x snap-mandatory overflow-x-auto sm:aspect-[3/1] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {banners.map((b, i) => {
           const active = i === index
           const hasText = !!(b.title || b.subtitle || b.button_label)
           const internal = b.link_url?.startsWith('/')
           const buttonClass =
-            'group/cta mt-5 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-brand shadow-lg shadow-black/20 transition hover:bg-gray-100 active:scale-95'
+            'group/cta mt-3 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm sm:mt-5 sm:px-6 sm:py-3 font-semibold text-brand shadow-lg shadow-black/20 transition hover:bg-gray-100 active:scale-95'
           const buttonInner = (
             <>
               {b.button_label}
@@ -102,15 +102,15 @@ export default function HeroCarousel({ banners }: { banners: Banner[] }) {
               />
 
               {hasText && (
-                <div className="absolute inset-0 flex items-end px-6 pb-14 sm:items-center sm:px-12 sm:pb-0 lg:px-20">
+                <div className="absolute inset-0 flex items-end px-5 pb-11 sm:items-center sm:px-12 sm:pb-0 lg:px-20">
                   <div className="max-w-xl text-white">
                     {b.title && (
-                      <h2 className={`text-3xl font-extrabold leading-tight tracking-tight drop-shadow-sm sm:text-4xl lg:text-5xl ${rise('delay-100')}`}>
+                      <h2 className={`text-2xl font-extrabold leading-tight tracking-tight drop-shadow-sm sm:text-4xl lg:text-5xl ${rise('delay-100')}`}>
                         {b.title}
                       </h2>
                     )}
                     {b.subtitle && (
-                      <p className={`mt-2 max-w-md text-sm text-white/90 sm:mt-3 sm:text-lg ${rise('delay-200')}`}>{b.subtitle}</p>
+                      <p className={`mt-1 line-clamp-1 max-w-md text-sm text-white/90 sm:mt-3 sm:line-clamp-none sm:text-lg ${rise('delay-200')}`}>{b.subtitle}</p>
                     )}
                     {b.button_label && b.link_url && (
                       <div className={rise('delay-300')}>

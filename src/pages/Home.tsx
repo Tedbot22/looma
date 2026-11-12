@@ -38,10 +38,11 @@ function Section({ title, subtitle, to, children }: { title: string; subtitle?: 
 
 const ROW_MAX = 6
 
-// A single row that scrolls sideways (scrollbar hidden), edge to edge on small screens.
+// A single row that scrolls sideways (scrollbar hidden). It stays inside the page margins, so cards
+// never run up against the edge of the screen.
 function ProductRow({ children }: { children: ReactNode }) {
   return (
-    <ul className="no-scrollbar -mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:gap-6 sm:px-6 lg:-mx-10 lg:px-10">
+    <ul className="no-scrollbar flex snap-x gap-4 overflow-x-auto pb-2 sm:gap-6">
       {children}
     </ul>
   )

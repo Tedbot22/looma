@@ -21,6 +21,9 @@ interface OrderToReview {
 
 // Where the customer lands after tapping a star. The star is already filled in; the quick questions
 // and the message are all optional, so leaving a review never feels like paperwork.
+// The fit and comfort questions are no longer asked (old reviews that answered them still show them).
+const FORM_QUESTIONS = REVIEW_QUESTIONS.filter((q) => q.key !== 'size_fit' && q.key !== 'comfort')
+
 export default function SubmitReview() {
   const { orderId } = useParams()
   const [params] = useSearchParams()
@@ -127,8 +130,6 @@ export default function SubmitReview() {
         order_id: order.id,
         user_id: user.id,
         rating,
-        size_fit: answers.size_fit ?? null,
-        comfort: answers.comfort ?? null,
         item_condition: answers.item_condition ?? null,
         delivery: answers.delivery ?? null,
         message: message.trim() || null,
@@ -181,20 +182,18 @@ export default function SubmitReview() {
         {itemNames.length > 0 && ` · ${itemNames.slice(0, 2).join(', ')}${itemNames.length > 2 ? ` +${itemNames.length - 2} more` : ''}`}
       </p>
 
-      <p className="mt-1 text-xs text-gray-500">Your review will also appear on the product pages of the items in this order.</p>
 
       <div className="mt-5">
-        <StarPicker value={rating} onChange={setRating} size={40} showLabel />
+        <StarPicker value={rating} onChange={setRating} size={35} showLabel />
       </div>
 
       {rating > 0 && (
         <div className="mt-6 space-y-6">
           <section>
             <h2 className="font-semibold">A few quick questions</h2>
-            <p className="text-xs text-gray-500">All optional. Tap an answer again to clear it.</p>
 
             <div className="mt-4 space-y-5">
-              {REVIEW_QUESTIONS.map((q) => (
+              {FORM_QUESTIONS.map((q) => (
                 <fieldset key={q.key}>
                   <legend className="mb-2 text-sm font-medium">{q.question}</legend>
                   <div className="flex flex-wrap gap-2">
@@ -227,25 +226,25 @@ export default function SubmitReview() {
             </div>
           </section>
 
+          <ReviewMediaPicker items={media} onChange={setMedia} disabled={submitting} />
+
           <section>
             <label htmlFor="review-message" className="font-semibold">
               Tell us more
             </label>
-            <p className="text-xs text-gray-500">Optional. What did you like, or what could we do better?</p>
+            <p className="text-xs text-gray-500">{`What did you like, or what could we do better? (optional)`}</p>
             <textarea
               id="review-message"
               value={message}
               onChange={(e) => setMessage(e.target.value.slice(0, MAX_MESSAGE_LENGTH))}
               rows={5}
-              placeholder="Share your experience with the item, the fit and the delivery…"
+              placeholder="Share your thoughts and experience about this item…"
               className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-brand"
             />
             <p className="mt-1 text-right text-xs text-gray-400">
               {message.length}/{MAX_MESSAGE_LENGTH}
             </p>
           </section>
-
-          <ReviewMediaPicker items={media} onChange={setMedia} disabled={submitting} />
 
           <div>
             <button
@@ -257,7 +256,7 @@ export default function SubmitReview() {
               {submitting ? progress || 'Sending…' : `Submit ${RATING_LABEL[rating].toLowerCase()} review`}
             </button>
             <p className="mt-3 text-center text-xs text-gray-500">
-              Your review will show your first name and last initial. Not now?{' '}
+              Not now?{' '}
               <Link to={`/order/${order.id}`} className="underline">
                 Skip
               </Link>

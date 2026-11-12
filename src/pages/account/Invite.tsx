@@ -78,7 +78,7 @@ export default function Invite() {
         <h1 className="text-2xl font-bold">Invite friends</h1>
       </div>
       <p className="mt-1 text-sm text-gray-500">
-        When {target} friends you invite each spend at least {formatNaira(minOrder)}, you win a surprise voucher
+        When {target} friends you invite each spend at least {formatNaira(minOrder)}, you earn a voucher
         from {STORE_NAME}: a discount or free delivery. Each voucher is valid for {validDays} days.
       </p>
 
@@ -93,8 +93,7 @@ export default function Invite() {
           <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${percent}%` }} />
         </div>
         <p className="mt-1 text-xs text-gray-400">
-          A friend counts once their first order of {formatNaira(minOrder)} or more (not counting delivery) has
-          been delivered.
+          A friend counts once they complete their first order of {formatNaira(minOrder)} or more.
         </p>
 
         {earned.length > 0 && (
@@ -116,7 +115,7 @@ export default function Invite() {
             </button>
           </div>
           <p className="mt-1 text-xs text-gray-400">
-            Your code: <span className="font-mono font-semibold">{profile.referral_code}</span>
+            Your refferal code: <span className="font-mono font-semibold">{profile.referral_code}</span>
           </p>
 
           <div className="mt-3 flex gap-2">
