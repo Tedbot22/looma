@@ -112,7 +112,7 @@ export default function Auth({ mode }: { mode: 'login' | 'signup' }) {
             />
             <input
               className={inputClass}
-              placeholder="Phone number (for delivery)"
+              placeholder="Phone number"
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
