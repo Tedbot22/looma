@@ -23,7 +23,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 // "Focused" pages: sign-in, checkout/order steps, review submission and the account area.
 // They hide the footer and the header search so people stay on the task.
 // To hide them somewhere else, add the path start here. To bring them back, remove it.
-const FOCUSED_PREFIXES = ['/login', '/signup', '/checkout', '/order', '/reviews', '/account', '/about', '/faq', '/privacy', '/terms', '/contact', '/product', '/cart',]
+const FOCUSED_PREFIXES = ['/login', '/signup', '/forgot-password', '/reset-password', '/checkout', '/order', '/reviews', '/account', '/about', '/faq', '/privacy', '/terms', '/contact', '/product', '/cart',]
 const FOOTER_PAGES = ['/', '/shop', '/product', '/cart', '/about', '/faq', '/privacy', '/terms', '/contact', '/todays-deals', '/recommended', '/recently-viewed', '/reviews', '/wishlist']
 
 const matches = (pathname: string, base: string) =>
