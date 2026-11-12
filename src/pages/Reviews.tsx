@@ -130,8 +130,7 @@ export default function Reviews() {
       </Link>
       <h1 className="text-2xl font-bold">Customer reviews</h1>
       <p className="mt-1 text-sm text-gray-500">
-        Real feedback from customers whose orders were delivered. Reviews are about shopping with us, since every item
-        is one of a kind.
+         Feedback from customers whose orders were delivered.
       </p>
 
       {stats.isLoading && <Skeleton className="mt-6 h-40 w-full rounded-2xl" />}

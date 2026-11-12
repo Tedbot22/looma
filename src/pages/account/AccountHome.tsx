@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronRight, CircleHelp, Clock, FileText, Gift, Headset, Heart, Info, LogOut, Package, ShieldCheck, Ticket, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -8,6 +9,7 @@ import { useCoupons } from '../../hooks/useCoupons'
 import { couponStatus } from '../../lib/coupons'
 import OrderAlertsCard from '../../components/OrderAlertsCard'
 import InstallApp from '../../components/InstallApp'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 interface MenuItem {
   to: string
@@ -51,6 +53,8 @@ export default function AccountHome() {
   const { data: coupons = [] } = useCoupons()
   const activeVouchers = coupons.filter((c) => couponStatus(c) === 'active').length
   const navigate = useNavigate()
+  const [confirmLogout, setConfirmLogout] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
 
   const name = profile?.full_name || 'Your account'
 
@@ -80,7 +84,10 @@ export default function AccountHome() {
   ]
 
   async function handleSignOut() {
+    setLoggingOut(true)
     await signOut()
+    setLoggingOut(false)
+    setConfirmLogout(false)
     navigate('/')
   }
 
@@ -112,11 +119,22 @@ export default function AccountHome() {
       </Section>
 
       <button
-        onClick={handleSignOut}
+        onClick={() => setConfirmLogout(true)}
         className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 py-3 text-sm font-medium text-gray-600 hover:border-sale hover:text-sale"
       >
-        <LogOut size={16} /> Log out
+        <LogOut size={16} /> Confirm
       </button>
+
+      <ConfirmDialog
+        open={confirmLogout}
+        title="Log out?"
+        confirmLabel="Confirm"
+        busy={loggingOut}
+        onConfirm={handleSignOut}
+        onCancel={() => setConfirmLogout(false)}
+      >
+        Are you sure you wan to log out?
+      </ConfirmDialog>
     </div>
   )
 }

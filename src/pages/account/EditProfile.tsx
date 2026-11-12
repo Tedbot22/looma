@@ -1,16 +1,19 @@
 import { useState, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { useProfile } from '../../hooks/useProfile'
 import AddressBook from '../../components/AddressBook'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 const inputClass =
   'w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand'
 
 export default function EditProfile() {
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
+  const navigate = useNavigate()
   const { data: profile } = useProfile()
   const queryClient = useQueryClient()
 
@@ -18,6 +21,8 @@ export default function EditProfile() {
   const [nameInput, setNameInput] = useState<string | null>(null)
   const [phoneInput, setPhoneInput] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false)
+  const [deactivating, setDeactivating] = useState(false)
 
   if (!profile || !user) return <p className="py-20 text-center text-gray-400">Loading…</p>
 
@@ -48,6 +53,26 @@ export default function EditProfile() {
     setNameInput(null)
     setPhoneInput(null)
     toast.success('Profile saved')
+  }
+
+  async function deactivate() {
+    setDeactivating(true)
+    const { error } = await supabase.rpc('deactivate_my_account')
+    if (error) {
+      setDeactivating(false)
+      setConfirmDeactivate(false)
+      toast.error(
+        error.message.includes('ACTIVE_ORDERS')
+          ? "You have an order in progress. You can deactivate once it's delivered or cancelled."
+          : error.message.includes('ADMIN_ACCOUNT')
+            ? "Store admin accounts can't be deactivated here."
+            : "We couldn't deactivate your account. Please try again."
+      )
+      return
+    }
+    await signOut()
+    toast.success('Your account has been deactivated.')
+    navigate('/', { replace: true })
   }
 
   return (
@@ -86,6 +111,37 @@ export default function EditProfile() {
       </form>
 
       <AddressBook />
+
+      <section className="mt-10 rounded-xl border border-red-200 p-4">
+        <h2 className="font-semibold text-red-700">Deactivate account</h2>
+        <p className="mt-1 text-sm text-gray-600">
+          You'll be logged out everywhere and won't be able to log in or place orders. Your order history is kept, and you can{' '}
+          <Link to="/contact" className="font-medium text-brand underline">
+            contact us
+          </Link>{' '}
+          to reactivate it.
+        </p>
+        <button
+          type="button"
+          onClick={() => setConfirmDeactivate(true)}
+          className="mt-3 rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+        >
+          Deactivate my account
+        </button>
+      </section>
+
+      <ConfirmDialog
+        open={confirmDeactivate}
+        title="Deactivate your account?"
+        confirmLabel="Deactivate"
+        danger
+        busy={deactivating}
+        onConfirm={deactivate}
+        onCancel={() => setConfirmDeactivate(false)}
+      >
+        You'll be logged out on all your devices and won't be able to log in or place orders until the store reactivates your
+        account.
+      </ConfirmDialog>
     </div>
   )
 }

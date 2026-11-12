@@ -34,6 +34,7 @@ export default function Auth({ mode }: { mode: 'login' | 'signup' }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [referralCode, setReferralCode] = useState(savedReferral)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   // Already logged in? Skip this page.
@@ -41,6 +42,10 @@ export default function Auth({ mode }: { mode: 'login' | 'signup' }) {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (isSignup && !acceptedTerms) {
+      toast.error('Please accept the Terms and Conditions to create an account.')
+      return
+    }
     setSubmitting(true)
 
     try {
@@ -55,6 +60,7 @@ export default function Auth({ mode }: { mode: 'login' | 'signup' }) {
               full_name: fullName.trim(),
               phone: phone.trim(),
               referral_code: referralCode.trim().toUpperCase(),
+              terms_accepted_at: new Date().toISOString(), // a record of when they agreed
             },
           },
         })
@@ -74,7 +80,9 @@ export default function Auth({ mode }: { mode: 'login' | 'signup' }) {
         navigate(next, { replace: true })
       }
     } catch (err) {
-      toast.error((err as Error).message)
+      const message = (err as Error).message
+      // Deactivated accounts are blocked from signing in (see supabase/phase10_deactivate_account.sql).
+      toast.error(/banned/i.test(message) ? 'This account has been deactivated. Contact us if you would like it reactivated.' : message)
     } finally {
       setSubmitting(false)
     }
@@ -140,6 +148,29 @@ export default function Auth({ mode }: { mode: 'login' | 'signup' }) {
             value={referralCode}
             onChange={(e) => setReferralCode(e.target.value)}
           />
+        )}
+
+        {isSignup && (
+          <label className="flex items-start gap-2.5 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+              required
+              className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+            />
+            <span>
+              I agree to the{' '}
+              <Link to="/terms" target="_blank" className="font-medium text-brand underline">
+                Terms and Conditions
+              </Link>{' '}
+              and{' '}
+              <Link to="/privacy" target="_blank" className="font-medium text-brand underline">
+                Privacy Policy
+              </Link>
+              .
+            </span>
+          </label>
         )}
 
         <button
