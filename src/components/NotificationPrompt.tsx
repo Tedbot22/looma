@@ -3,6 +3,7 @@ import { Bell } from 'lucide-react'
 import { STORE_NAME } from '../config'
 import { useAuth } from '../context/AuthContext'
 import { useCustomerPush } from '../hooks/useCustomerPush'
+import { useIsStandalone } from '../hooks/useInstallApp'
 import { isOptedOut } from '../lib/push'
 
 const SNOOZE_KEY = 'looma_push_snooze'
@@ -29,6 +30,7 @@ function snooze(userId: string) {
 
 // Asks a logged-in customer to turn on order notifications.
 //
+// It only shows inside the installed app (PWA), never in a normal browser tab.
 // It shows whenever notifications are off for this device AND we are still allowed to ask:
 //   - the browser permission is still undecided ("default"), or
 //   - permission was already granted but this device isn't attached to the account any more
@@ -38,12 +40,13 @@ function snooze(userId: string) {
 // Tapping "Turn on" is what lets the browser show its own permission pop-up (browsers need a tap).
 export default function NotificationPrompt({ enabled }: { enabled: boolean }) {
   const { user } = useAuth()
+  const standalone = useIsStandalone()
   const { state, busy, enable } = useCustomerPush()
   const [, setTick] = useState(0) // re-render after snoozing
 
   const permission = typeof Notification !== 'undefined' ? Notification.permission : 'denied'
   const canAsk = permission === 'default' || permission === 'granted'
-  if (!enabled || !user || state !== 'off' || !canAsk) return null
+  if (!enabled || !user || !standalone || state !== 'off' || !canAsk) return null
   if (isOptedOut(user.id) || snoozedUntil(user.id) > Date.now()) return null
 
   const userId = user.id
