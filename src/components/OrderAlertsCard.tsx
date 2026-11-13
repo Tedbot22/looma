@@ -1,5 +1,5 @@
 import { Bell, BellOff } from 'lucide-react'
-import { useCustomerPush } from '../../../looma/src/hooks/useCustomerPush'
+import { useCustomerPush } from '../hooks/useCustomerPush'
 import InstallApp from './InstallApp'
 
 const WHAT = 'when your order is confirmed, out for delivery or delivered'
