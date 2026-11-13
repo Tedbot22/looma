@@ -241,7 +241,7 @@ function RulesPanel() {
         <Moon size={14} className="mt-0.5 shrink-0" />
         <span>
           Cart and inactive-customer messages are held until morning: none go out between {hourLabel(s.quiet_start_hour)} and{' '}
-          {hourLabel(s.quiet_end_hour)} (Lagos time). Customers can also switch off offers and reminders on their account page.
+          {hourLabel(s.quiet_end_hour)} (Lagos time).
         </span>
       </p>
 
