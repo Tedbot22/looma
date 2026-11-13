@@ -45,7 +45,7 @@ export default function OrderAlertsCard({ variant = 'card' }: { variant?: 'card'
           <BellOff size={20} className="shrink-0 text-gray-400" />
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">Order updates</p>
+          <p className="text-sm font-medium">Notifications</p>
           <p className="text-xs text-gray-500">
             {state === 'on' ? 'On for this device' : state === 'off' ? 'Off for this device' : (notes[state] ?? `Get a notification ${WHAT}`)}
           </p>
@@ -56,7 +56,7 @@ export default function OrderAlertsCard({ variant = 'card' }: { variant?: 'card'
             type="button"
             role="switch"
             aria-checked={state === 'on'}
-            aria-label="Order updates"
+            aria-label="Notifications"
             onClick={state === 'on' ? disable : enable}
             disabled={busy}
             className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
