@@ -32,6 +32,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Tell the server this customer is around (drives the "we miss you" message). The database
+  // writes at most once an hour, and a failure here must never get in the customer's way.
+  const userId = session?.user?.id
+  useEffect(() => {
+    if (!userId) return
+    let last = 0
+    const ping = () => {
+      if (Date.now() - last < 60 * 60 * 1000) return
+      last = Date.now()
+      supabase.rpc('touch_last_seen').then(
+        () => {},
+        () => {}
+      )
+    }
+    ping()
+    const onVisible = () => document.visibilityState === 'visible' && ping()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [userId])
+
   const value: AuthContextValue = {
     user: session?.user ?? null,
     loading,

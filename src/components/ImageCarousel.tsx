@@ -1,6 +1,12 @@
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, ImageOff } from 'lucide-react'
 
+// The photo frame. On phones it is a little shorter than the card shape (4:5), never taller than 70% of the
+// screen, and on small tablets it stops growing at a sensible width and centres. From md up it sits in its
+// half of the page at the same 3:4 shape as the product cards.
+const FRAME =
+  'relative mx-auto aspect-[4/5] max-h-[70vh] w-full max-w-md overflow-hidden rounded-2xl bg-gray-100 md:aspect-[3/4] md:max-h-none md:max-w-none'
+
 interface Props {
   images: string[]
   alt: string
@@ -32,7 +38,7 @@ export default function ImageCarousel({ images, alt, children }: Props) {
 
   if (images.length === 0) {
     return (
-      <div className="relative flex aspect-[3/4] items-center justify-center overflow-hidden rounded-2xl bg-gray-100 text-gray-300">
+      <div className={`${FRAME} flex items-center justify-center text-gray-300`}>
         <ImageOff size={40} />
         {children}
       </div>
@@ -42,7 +48,7 @@ export default function ImageCarousel({ images, alt, children }: Props) {
   const multiple = images.length > 1
 
   return (
-    <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-gray-100">
+    <div className={FRAME}>
       <div
         ref={scroller}
         onScroll={handleScroll}

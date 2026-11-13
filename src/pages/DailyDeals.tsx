@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { useProductPool } from '../hooks/useRecommendations'
 import { dailyDealsList } from '../lib/dailyDeals'
 import ProductCard from '../components/ProductCard'
+import { PRODUCT_GRID } from '../lib/layout'
 import { ProductGridSkeleton } from '../components/Skeleton'
 
 // Everything behind the home page's "Daily deals" row: the newest items first, then a daily mix of
@@ -24,7 +25,7 @@ export default function DailyDeals() {
       {pool.error && <p className="text-red-600">Couldn't load the deals.</p>}
       {!pool.isLoading && items.length === 0 && <p className="text-gray-500">Nothing in stock right now. Check back soon!</p>}
 
-      <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-6 lg:grid-cols-4 xl:grid-cols-5">
+      <div className={PRODUCT_GRID}>
         {items.map((p) => (
           <ProductCard key={p.id} product={p} />
         ))}

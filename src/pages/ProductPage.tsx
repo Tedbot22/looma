@@ -185,7 +185,7 @@ export default function ProductPage() {
         <ArrowLeft size={16} /> Back to shop
       </Link>
 
-      <div className="grid gap-8 md:grid-cols-2">
+      <div className="grid gap-5 sm:gap-8 md:grid-cols-2">
         {/* Gallery: a swipeable carousel */}
         <ImageCarousel images={product.images} alt={product.name}>
           {percentOff && !soldOut && (
@@ -196,9 +196,9 @@ export default function ProductPage() {
         </ImageCarousel>
 
         {/* Details */}
-        <div className="space-y-5">
+        <div className="space-y-4 sm:space-y-5">
           <div className="flex items-start justify-between gap-3">
-            <h1 className="text-2xl font-bold">{product.name}</h1>
+            <h1 className="text-xl font-bold sm:text-2xl">{product.name}</h1>
             <button
               onClick={handleWishlist}
               aria-label={saved ? 'Remove from wishlist' : 'Save to wishlist'}
@@ -224,7 +224,7 @@ export default function ProductPage() {
                       key={v.id}
                       disabled={out}
                       onClick={() => setSelectedId(v.id)}
-                      className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                      className={`min-h-10 rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors sm:px-4 ${
                         out
                           ? 'cursor-not-allowed border-gray-100 text-gray-300 line-through'
                           : selected
@@ -266,7 +266,7 @@ export default function ProductPage() {
                     <button
                       onClick={handleLess}
                       aria-label={inCart <= 1 ? 'Remove from cart' : 'One less'}
-                      className="p-3.5 text-brand transition-transform hover:bg-brand/10 active:scale-90"
+                      className="p-3 text-brand transition-transform hover:bg-brand/10 active:scale-90 sm:p-3.5"
                     >
                       {inCart <= 1 ? <Trash2 size={18} /> : <Minus size={18} />}
                     </button>
@@ -279,7 +279,7 @@ export default function ProductPage() {
                       onClick={handleMore}
                       aria-label="One more"
                       disabled={inCart >= active.stock}
-                      className="p-3.5 text-brand transition-transform hover:bg-brand/10 active:scale-90 disabled:opacity-30"
+                      className="p-3 text-brand transition-transform hover:bg-brand/10 active:scale-90 disabled:opacity-30 sm:p-3.5"
                     >
                       <Plus size={18} />
                     </button>
@@ -288,7 +288,7 @@ export default function ProductPage() {
 
                 <button
                   onClick={inCart > 0 ? () => navigate('/cart') : handleAddToCart}
-                  className="min-w-0 flex-1 rounded-lg bg-brand py-3.5 font-semibold text-white transition-transform hover:bg-brand-light active:scale-[0.98]"
+                  className="min-w-0 flex-1 rounded-lg bg-brand px-3 py-3 text-sm font-semibold text-white transition-transform hover:bg-brand-light active:scale-[0.98] sm:py-3.5 sm:text-base"
                 >
                   <span key={inCart > 0 ? 'go' : 'add'} className="pop-in flex items-center justify-center gap-2">
                     <ShoppingCart size={18} /> {inCart > 0 ? 'Go to cart' : 'Add to cart'}
@@ -301,7 +301,7 @@ export default function ProductPage() {
               href={whatsappLink(contactMessage)}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 rounded-lg border border-gray-200 py-3 font-medium text-gray-700 hover:border-brand"
+              className="flex items-center justify-center gap-2 rounded-lg border border-gray-200 py-3 text-sm font-medium text-gray-700 hover:border-brand sm:text-base"
             >
               <MessageCircle size={18} /> Contact seller
             </a>

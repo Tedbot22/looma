@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
+  Bell,
   ExternalLink,
   Image as ImageIcon,
   LayoutDashboard,
@@ -93,6 +94,7 @@ export default function AdminLayout() {
         { to: '/admin/customers', label: 'Customers', icon: Users },
         { to: '/admin/reviews', label: 'Reviews', icon: Star },
         { to: '/admin/support', label: 'Support', icon: MessageCircle, badge: waiting ?? 0 },
+        { to: '/admin/notifications', label: 'Notifications', icon: Bell },
       ],
     },
     {

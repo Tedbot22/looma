@@ -1,6 +1,33 @@
 import { Bell, BellOff } from 'lucide-react'
 import { useCustomerPush } from '../hooks/useCustomerPush'
+import { useMarketingPref } from '../hooks/useMarketingPref'
 import InstallApp from './InstallApp'
+
+// A second switch under the main one: reminders about the cart and news from the store.
+function OffersRow() {
+  const { enabled, isLoading, busy, set } = useMarketingPref()
+  return (
+    <div className="mt-3 flex items-center gap-4 border-t border-gray-100 pt-3">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">Offers &amp; reminders</p>
+        <p className="text-xs text-gray-500">Cart reminders and news about new arrivals and deals. Not more than a couple a week.</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={enabled}
+        aria-label="Offers and reminders"
+        onClick={() => set(!enabled)}
+        disabled={busy || isLoading}
+        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60 ${enabled ? 'bg-brand' : 'bg-gray-300'}`}
+      >
+        <span
+          className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-5' : ''}`}
+        />
+      </button>
+    </div>
+  )
+}
 
 const WHAT = 'when your order is confirmed, out for delivery or delivered'
 
@@ -71,6 +98,7 @@ export default function OrderAlertsCard({ variant = 'card' }: { variant?: 'card'
           </button>
         )}
       </div>
+      {state === 'on' && <OffersRow />}
       {state === 'needs-install' && <InstallApp variant="card" className="mt-3" />}
     </div>
   )

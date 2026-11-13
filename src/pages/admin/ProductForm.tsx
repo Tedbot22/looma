@@ -5,6 +5,7 @@ import { ArrowLeft, ImagePlus, Plus, Star, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { uploadProductImage } from '../../lib/images'
+import { PRODUCT_PHOTO_HINT } from '../../lib/layout'
 import type { Category, Product, ProductVariant } from '../../lib/types'
 
 interface Props {
@@ -228,6 +229,7 @@ export default function ProductForm({ initial }: Props) {
           <p className={labelClass}>
             Photos <span className="font-normal text-gray-400">(first photo is the cover)</span>
           </p>
+          <p className="mb-2 text-xs text-gray-400">Best size: {PRODUCT_PHOTO_HINT}. Other shapes are centred and trimmed to fit.</p>
           <div className="flex flex-wrap gap-3">
             {images.map((url, i) => (
               <div key={url} className="relative h-28 w-24 overflow-hidden rounded-lg bg-gray-100">

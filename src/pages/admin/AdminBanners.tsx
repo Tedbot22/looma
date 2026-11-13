@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { useDialog } from '../../context/DialogContext'
 import { supabase } from '../../lib/supabase'
 import { uploadProductImage } from '../../lib/images'
+import { BANNER_SIZE_HINT } from '../../lib/layout'
 import { ListSkeleton } from '../../components/Skeleton'
 
 interface BannerRow {
@@ -182,7 +183,7 @@ export default function AdminBanners() {
     try {
       let order = Math.max(-1, ...(banners ?? []).map((b) => b.sort_order))
       for (const file of images) {
-        const url = await uploadProductImage(file, 1800) // wide banners keep more detail than product photos
+        const url = await uploadProductImage(file, 2400) // wide banners keep more detail than product photos
         const { error } = await supabase.from('hero_banners').insert({ image_url: url, sort_order: ++order })
         if (error) throw error
       }
@@ -217,7 +218,7 @@ export default function AdminBanners() {
       <h1 className="text-xl font-bold">Home page banners</h1>
       <p className="mb-5 mt-1 text-sm text-gray-500">
         These images slide across the top of the home page, in the order shown here. Wide landscape photos work best
-        (for example 1800 × 800). If you add none, a simple welcome message is shown instead.
+        (best size: {BANNER_SIZE_HINT}). Keep the main subject and any words in the middle half of the picture, because phones show a narrower slice. If you add none, a simple welcome message is shown instead.
       </p>
 
       <button

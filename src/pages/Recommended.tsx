@@ -6,7 +6,9 @@ import ProductCard from '../components/ProductCard'
 import { ProductGridSkeleton } from '../components/Skeleton'
 import type { ProductWithVariants } from '../lib/types'
 
-const GRID = 'grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-6 lg:grid-cols-4 xl:grid-cols-5'
+import { PRODUCT_GRID } from '../lib/layout'
+
+const GRID = PRODUCT_GRID
 
 // The full list behind "You may also like". With ?like=<product id> it shows more items like that product,
 // tuned to the customer (the same algorithm as the product page row). Without it, it shows picks based on

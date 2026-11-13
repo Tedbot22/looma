@@ -61,14 +61,14 @@ export default function HeroCarousel({ banners }: { banners: Banner[] }) {
       <div
         ref={scroller}
         onScroll={handleScroll}
-        className="flex aspect-[16/9] max-h-[380px] w-full snap-x snap-mandatory overflow-x-auto sm:aspect-[3/1] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex aspect-[16/9] min-h-[200px] max-h-[380px] w-full snap-x snap-mandatory overflow-x-auto sm:aspect-[3/1] sm:min-h-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {banners.map((b, i) => {
           const active = i === index
           const hasText = !!(b.title || b.subtitle || b.button_label)
           const internal = b.link_url?.startsWith('/')
           const buttonClass =
-            'group/cta mt-3 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm sm:mt-5 sm:px-6 sm:py-3 font-semibold text-brand shadow-lg shadow-black/20 transition hover:bg-gray-100 active:scale-95'
+            'group/cta mt-2 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm sm:mt-5 sm:px-6 sm:py-3 font-semibold text-brand shadow-lg shadow-black/20 transition hover:bg-gray-100 active:scale-95'
           const buttonInner = (
             <>
               {b.button_label}
@@ -105,7 +105,7 @@ export default function HeroCarousel({ banners }: { banners: Banner[] }) {
                 <div className="absolute inset-0 flex items-end px-5 pb-11 sm:items-center sm:px-12 sm:pb-0 lg:px-20">
                   <div className="max-w-xl text-white">
                     {b.title && (
-                      <h2 className={`text-2xl font-extrabold leading-tight tracking-tight drop-shadow-sm sm:text-4xl lg:text-5xl ${rise('delay-100')}`}>
+                      <h2 className={`text-xl font-extrabold leading-tight tracking-tight drop-shadow-sm min-[400px]:text-2xl sm:text-4xl lg:text-5xl ${rise('delay-100')}`}>
                         {b.title}
                       </h2>
                     )}

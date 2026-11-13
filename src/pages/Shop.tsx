@@ -8,6 +8,7 @@ import { searchProducts } from '../lib/search'
 import { pageTitle, useSeo } from '../lib/seo'
 import { STORE_NAME } from '../config'
 import ProductCard from '../components/ProductCard'
+import { PRODUCT_GRID } from '../lib/layout'
 import { ChipsSkeleton, ProductGridSkeleton } from '../components/Skeleton'
 import type { Category, ProductWithVariants } from '../lib/types'
 
@@ -296,7 +297,7 @@ export default function Shop() {
       )}
 
       <div
-        className={`grid grid-cols-2 gap-x-4 gap-y-8 transition-opacity sm:grid-cols-3 sm:gap-x-6 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 ${
+        className={`${PRODUCT_GRID} transition-opacity ${
           isPlaceholderData ? 'opacity-60' : ''
         }`}
       >

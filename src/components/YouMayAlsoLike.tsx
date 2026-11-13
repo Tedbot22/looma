@@ -29,7 +29,7 @@ export default function YouMayAlsoLike({ product }: { product: ProductWithVarian
       {isLoading ? (
         <ProductGridSkeleton count={4} />
       ) : (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-4 sm:gap-x-6">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:gap-x-5 sm:gap-y-8 md:grid-cols-4">
           {items.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}

@@ -100,7 +100,7 @@ export default function ProductCard({ product }: { product: ProductWithVariants 
         </Link>
 
         {percentOff && !soldOut && (
-          <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-sale px-2 py-0.5 text-xs font-semibold text-white">
+          <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-full bg-sale px-1.5 py-0.5 text-[11px] font-semibold text-white sm:left-2 sm:top-2 sm:px-2 sm:text-xs">
             -{percentOff}%
           </span>
         )}
@@ -115,7 +115,7 @@ export default function ProductCard({ product }: { product: ProductWithVariants 
         <button
           onClick={toggleWishlist}
           aria-label={saved ? 'Remove from wishlist' : 'Save to wishlist'}
-          className="absolute right-2 top-2 rounded-full bg-white/90 p-2 shadow-sm hover:bg-white"
+          className="absolute right-1.5 top-1.5 rounded-full bg-white/90 p-1.5 shadow-sm hover:bg-white sm:right-2 sm:top-2 sm:p-2"
         >
           <Heart size={16} className={saved ? 'fill-sale text-sale' : 'text-gray-600'} />
         </button>
@@ -123,7 +123,7 @@ export default function ProductCard({ product }: { product: ProductWithVariants 
 
       <div className="mt-2 space-y-0.5">
         <Link to={href} className="block">
-          <h3 className="truncate text-sm font-medium text-gray-800">{product.name}</h3>
+          <h3 className="truncate text-[13px] font-medium text-gray-800 sm:text-sm">{product.name}</h3>
         </Link>
 
         <Link to={href} className="block">
@@ -150,7 +150,7 @@ export default function ProductCard({ product }: { product: ProductWithVariants 
                   type="button"
                   onClick={decrease}
                   aria-label={cartQty <= 1 ? `Remove ${product.name} from cart` : 'One less'}
-                  className="rounded-md bg-brand px-3 py-2.5 text-white transition-transform hover:bg-brand-light active:scale-90"
+                  className="rounded-md bg-brand p-2.5 text-white transition-transform hover:bg-brand-light active:scale-90 sm:px-3"
                 >
                   <Minus size={16} />
                 </button>
@@ -164,7 +164,7 @@ export default function ProductCard({ product }: { product: ProductWithVariants 
                   onClick={increase}
                   aria-label="One more"
                   disabled={cartQty >= single.stock}
-                  className="rounded-md bg-brand px-3 py-2.5 text-white transition-transform hover:bg-brand-light active:scale-90 disabled:opacity-40"
+                  className="rounded-md bg-brand p-2.5 text-white transition-transform hover:bg-brand-light active:scale-90 disabled:opacity-40 sm:px-3"
                 >
                   <Plus size={16} />
                 </button>
@@ -174,9 +174,9 @@ export default function ProductCard({ product }: { product: ProductWithVariants 
                 type="button"
                 onClick={quickAdd}
                 aria-label={`Add ${product.name} to cart`}
-                className="pop-in flex w-full items-center justify-center gap-2 rounded-md bg-brand px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white transition-transform hover:bg-brand-light active:scale-[0.97]"
+                className="pop-in flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-brand px-2 py-2.5 text-[11px] font-bold uppercase tracking-wide text-white transition-transform hover:bg-brand-light active:scale-[0.97] sm:gap-2 sm:px-3 sm:text-xs"
               >
-                <ShoppingCart size={16} /> Add to cart
+                <ShoppingCart size={15} className="shrink-0" /> Add to cart
               </button>
             )}
           </div>

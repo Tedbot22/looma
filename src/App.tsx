@@ -41,6 +41,7 @@ const AdminStore = lazy(() => import('./pages/admin/AdminStore'))
 const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'))
 const AdminPaymentIssues = lazy(() => import('./pages/admin/AdminPaymentIssues'))
 const AdminSupport = lazy(() => import('./pages/admin/AdminSupport'))
+const AdminNotifications = lazy(() => import('./pages/admin/AdminNotifications'))
 const ComingSoon = lazy(() => import('./pages/ComingSoon'))
 const RiderDelivery = lazy(() => import('./pages/RiderDelivery'))
 import ScrollToTop from './components/ScrollToTop'
@@ -86,6 +87,7 @@ export default function App() {
           <Route path="reviews" element={<AdminReviews />} />
           <Route path="payments" element={<AdminPaymentIssues />} />
           <Route path="support" element={<AdminSupport />} />
+          <Route path="notifications" element={<AdminNotifications />} />
         </Route>
 
         {/* Rider delivery page: no login, no store header/footer. The secret link is the credential. */}
