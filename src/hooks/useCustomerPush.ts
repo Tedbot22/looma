@@ -3,7 +3,14 @@ import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useProfile } from './useProfile'
-import { VAPID_PUBLIC_KEY, isPushSupported, readyRegistration, urlBase64ToUint8Array } from '../lib/push'
+import {
+  VAPID_PUBLIC_KEY,
+  getOrCreateSubscription,
+  isPushSupported,
+  readyRegistration,
+  setOptedOut,
+  subscriptionMatchesKey,
+} from '../lib/push'
 import { isIOS, isStandalone } from '../lib/install'
 
 export type PushState =
@@ -31,6 +38,8 @@ export function useCustomerPush() {
     if (!registration) return setState('unsupported')
     const subscription = await registration.pushManager.getSubscription()
     if (!subscription || !user) return setState('off')
+    // Made with an old key: the push service would reject it, so treat it as off and let the next "turn on" replace it.
+    if (!subscriptionMatchesKey(subscription)) return setState('off')
 
     // "On" means THIS device is saved under THIS account on the server.
     const { data } = await supabase
@@ -45,35 +54,34 @@ export function useCustomerPush() {
     refresh().catch(() => setState('unsupported'))
   }, [refresh])
 
-  async function enable() {
-    if (!user || !VAPID_PUBLIC_KEY) return
+  // Resolves to true when this device is now saved under the customer's account.
+  async function enable(): Promise<boolean> {
+    if (!user || !VAPID_PUBLIC_KEY) return false
     setBusy(true)
     try {
       // 1. Ask permission (the browser shows its own prompt; this must come from a tap).
       const permission = await Notification.requestPermission()
       if (permission !== 'granted') {
         setState(permission === 'denied' ? 'blocked' : 'off')
-        return
+        return false
       }
 
       // 2. Subscribe this device (reuses the existing subscription if there is one).
       const registration = await readyRegistration()
       if (!registration) throw new Error('The app is still loading. Try again in a moment.')
-      const subscription =
-        (await registration.pushManager.getSubscription()) ??
-        (await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-        }))
+      const subscription = await getOrCreateSubscription(registration)
 
       // 3. Save it under this customer. The database function sets the owner from the login.
       const { error } = await supabase.rpc('register_push_subscription', { p_subscription: subscription.toJSON() })
       if (error) throw error
 
+      setOptedOut(user.id, false)
       setState('on')
       toast.success("Order updates are on. We'll notify you as your order moves.")
+      return true
     } catch (err) {
       toast.error(`Couldn't turn on notifications: ${(err as Error).message}`)
+      return false
     } finally {
       setBusy(false)
     }
@@ -89,6 +97,7 @@ export function useCustomerPush() {
         // The owner's order alerts use the same browser subscription, so only fully remove it for customers.
         if (!profile?.is_admin) await subscription.unsubscribe()
       }
+      if (user) setOptedOut(user.id, true) // they chose this: don't ask again
       setState('off')
       toast.success('Order updates are off on this device')
     } catch (err) {

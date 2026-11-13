@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, CalendarClock, Megaphone, Moon, Send } from 'lucide-react'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { STORE_NAME } from '../../config'
@@ -358,14 +359,44 @@ function PromoPanel() {
     const id = await create(new Date())
     if (!id) return setBusy(false)
 
-    // Ask the scheduler to run right away instead of waiting for its next 5-minute turn.
-    const { data, error } = await supabase.functions.invoke('push-scheduler', { body: { task: 'promos' } })
+    // Ask the scheduler to send exactly this promotion right away instead of waiting for its next 5-minute turn.
+    const { data, error } = await supabase.functions.invoke('push-scheduler', { body: { task: 'promos', promo_id: id } })
     setBusy(false)
+
     if (error) {
-      toast.info("Saved. It will go out within 5 minutes.")
+      // supabase-js only says "non-2xx status code". The real reason is in the response body.
+      let detail = error.message
+      if (error instanceof FunctionsHttpError) {
+        detail = `${error.context.status}: ${(await error.context.text().catch(() => '')) || 'no details'}`
+      }
+      toast.error(`Saved, but it didn't start sending: ${detail}. The timer will retry within 5 minutes.`)
     } else {
-      const mine = (data?.promos as { id: string; delivered: number }[] | undefined)?.find((p) => p.id === id)
-      toast.success(mine ? `Sent to ${mine.delivered} ${mine.delivered === 1 ? 'customer' : 'customers'}` : 'Sending now')
+      type Report = {
+        id: string
+        delivered?: number
+        failed?: number
+        noDevice?: number
+        audience?: number
+        skippedCap?: number
+        errors?: string[]
+        error?: string
+      }
+      const mine = (data?.promos as Report[] | undefined)?.find((p) => p.id === id)
+      if (!mine) {
+        toast.info('Saved. It will go out on the next timer run (within 5 minutes).')
+      } else if (mine.error) {
+        toast.error(`Couldn't send: ${mine.error}`)
+      } else if ((mine.delivered ?? 0) > 0) {
+        toast.success(`Sent to ${mine.delivered} ${mine.delivered === 1 ? 'customer' : 'customers'}`)
+      } else if (!mine.audience) {
+        toast.error('Nobody to send to: no customer has notifications turned on (or marketing messages are off for all of them).')
+      } else if (mine.errors?.length) {
+        toast.error(`The push service rejected it: ${mine.errors.join(' | ')}`)
+      } else if ((mine.noDevice ?? 0) > 0 || (mine.failed ?? 0) > 0) {
+        toast.error(`Not delivered: ${mine.audience} eligible, but none of their devices could receive it.`)
+      } else {
+        toast.info(`Everyone eligible (${mine.skippedCap ?? 0} over the weekly limit) was already skipped. Nothing was sent.`)
+      }
     }
     reset()
   }

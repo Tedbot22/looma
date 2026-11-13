@@ -11,7 +11,7 @@
 //
 // Who may call it:
 //   - the database timer, with the secret header  x-webhook-secret
-//   - the logged-in admin pressing "Send now" (runs only the promotions job)
+//   - the logged-in admin pressing "Send now" (runs only the promotions job; may pass promo_id to send exactly that one)
 //
 // Deploy with:  npx supabase functions deploy push-scheduler --no-verify-jwt
 // (--no-verify-jwt because the timer has no user login. We check access ourselves below.)
@@ -92,13 +92,15 @@ interface DeliverResult {
   delivered: number // customers who received it on at least one device
   skipped: number // already sent before (or claimed by an overlapping run)
   failed: number // no device accepted it; will be retried on the next run
+  noDevice?: number // of the failed ones: customers with no saved device at all
+  errors?: string[] // a few reasons the push service gave, so a silent failure is never a mystery
 }
 
 // Sends each item to the customer's saved devices.
 // The message is "claimed" in push_log BEFORE sending, so an overlapping run can never send it twice.
 // If no device accepted it, the claim is released and the next run tries again.
 async function deliver(items: Item[], ttl: number, deadline = Infinity): Promise<DeliverResult> {
-  const result: DeliverResult = { delivered: 0, skipped: 0, failed: 0 }
+  const result: DeliverResult = { delivered: 0, skipped: 0, failed: 0, noDevice: 0, errors: [] }
 
   for (const group of chunk(items, 40)) {
     if (Date.now() > deadline) break
@@ -130,13 +132,17 @@ async function deliver(items: Item[], ttl: number, deadline = Infinity): Promise
     const outcomes = await Promise.all(
       mine.map(async (item) => {
         const devices = byUser.get(item.userId) ?? []
+        if (devices.length === 0) result.noDevice!++
         const sent = await Promise.all(
           devices.map(async (d) => {
             try {
               await webpush.sendNotification(d.subscription, JSON.stringify(item.payload), { TTL: ttl, urgency: 'normal' })
               return true
             } catch (err) {
-              const e = err as { statusCode?: number }
+              const e = err as { statusCode?: number; body?: string; message?: string }
+              const reason = `${e.statusCode ?? 'error'}: ${e.body || e.message || 'unknown'}`.slice(0, 200)
+              console.error('Push rejected:', reason)
+              if (result.errors!.length < 3 && !result.errors!.includes(reason)) result.errors!.push(reason)
               if (e.statusCode === 404 || e.statusCode === 410) {
                 await supabase.from('customer_push_subscriptions').delete().eq('id', d.id) // device is gone
               }
@@ -230,17 +236,18 @@ async function runInactive(): Promise<DeliverResult> {
 // ---------------------------------------------------------------------------
 // 3. Promotions the owner scheduled
 // ---------------------------------------------------------------------------
-async function runPromos(deadline: number): Promise<Record<string, unknown>[]> {
+async function runPromos(deadline: number, onlyId?: string): Promise<Record<string, unknown>[]> {
   const nowIso = new Date().toISOString()
   const staleIso = new Date(Date.now() - 15 * 60_000).toISOString() // a run that stopped halfway is resumed after 15 minutes
 
-  const { data: due } = await supabase
+  // "Send now" names the exact promotion. It must not depend on the browser's clock matching this server's,
+  // which is why it skips the "is it due yet?" check that the timer uses.
+  let query = supabase
     .from('promo_messages')
     .select('id, title, body, url, status, started_at')
     .in('status', ['scheduled', 'sending'])
-    .lte('scheduled_for', nowIso)
-    .order('scheduled_for')
-    .limit(5)
+  query = onlyId ? query.eq('id', onlyId) : query.lte('scheduled_for', nowIso).order('scheduled_for').limit(5)
+  const { data: due } = await query
 
   const report: Record<string, unknown>[] = []
   for (const promo of due ?? []) {
@@ -271,6 +278,7 @@ async function runPromos(deadline: number): Promise<Record<string, unknown>[]> {
     const { data: audience, error } = await supabase.rpc('push_promo_audience')
     if (error) {
       console.error('promo audience:', error.message)
+      report.push({ id: promo.id, error: `audience lookup failed: ${error.message}` })
       continue
     }
     const eligible = (audience ?? []).filter((a) => !a.over_cap)
@@ -298,7 +306,7 @@ async function runPromos(deadline: number): Promise<Record<string, unknown>[]> {
         .update({ status: 'sent', sent_at: new Date().toISOString(), recipients: count ?? r.delivered, skipped_cap: skippedCap })
         .eq('id', promo.id)
     }
-    report.push({ id: promo.id, ...r, skippedCap, finished })
+    report.push({ id: promo.id, ...r, audience: (audience ?? []).length, skippedCap, finished })
   }
   return report
 }
@@ -426,7 +434,8 @@ Deno.serve(async (req) => {
 
   // "Send now" from the admin page only needs the promotions.
   if (fromAdmin || body.task === 'promos') {
-    summary.promos = await runPromos(deadline)
+    const onlyId = fromAdmin && typeof body.promo_id === 'string' ? body.promo_id : undefined
+    summary.promos = await runPromos(deadline, onlyId)
     return json(summary)
   }
 

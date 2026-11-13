@@ -3,41 +3,60 @@ import { Bell } from 'lucide-react'
 import { STORE_NAME } from '../config'
 import { useAuth } from '../context/AuthContext'
 import { useCustomerPush } from '../hooks/useCustomerPush'
-import { useIsStandalone } from '../hooks/useInstallApp'
+import { isOptedOut } from '../lib/push'
 
-const SEEN_KEY = 'looma_push_prompted'
+const SNOOZE_KEY = 'looma_push_snooze'
+const SNOOZE_DAYS = 3
 
-// The first time a logged-in customer opens the installed app, ask about notifications.
-// Tapping "Turn on" does exactly what the account-page toggle does (the browser's own permission
-// prompt appears). We ask with our own button first because browsers only allow that prompt
-// after a tap, and an unexplained pop-up gets blocked far more often.
+function snoozedUntil(userId: string): number {
+  try {
+    const all = JSON.parse(localStorage.getItem(SNOOZE_KEY) ?? '{}') as Record<string, number>
+    return all[userId] ?? 0
+  } catch {
+    return 0
+  }
+}
+
+function snooze(userId: string) {
+  try {
+    const all = JSON.parse(localStorage.getItem(SNOOZE_KEY) ?? '{}') as Record<string, number>
+    all[userId] = Date.now() + SNOOZE_DAYS * 24 * 3600_000
+    localStorage.setItem(SNOOZE_KEY, JSON.stringify(all))
+  } catch {
+    /* storage blocked: it may ask again on the next visit */
+  }
+}
+
+// Asks a logged-in customer to turn on order notifications.
+//
+// It shows whenever notifications are off for this device AND we are still allowed to ask:
+//   - the browser permission is still undecided ("default"), or
+//   - permission was already granted but this device isn't attached to the account any more
+//     (e.g. after logging out and back in), in which case no browser pop-up is needed at all.
+// "Not now" only snoozes it for a few days. It never asks again if the customer switched
+// notifications off on purpose, and the browser can't be asked again once it is set to "Block".
+// Tapping "Turn on" is what lets the browser show its own permission pop-up (browsers need a tap).
 export default function NotificationPrompt({ enabled }: { enabled: boolean }) {
   const { user } = useAuth()
-  const standalone = useIsStandalone()
   const { state, busy, enable } = useCustomerPush()
-  const [done, setDone] = useState(() => {
-    try {
-      return localStorage.getItem(SEEN_KEY) === '1'
-    } catch {
-      return false
-    }
-  })
+  const [, setTick] = useState(0) // re-render after snoozing
 
-  const canAsk = typeof Notification !== 'undefined' && Notification.permission === 'default'
-  if (!enabled || !user || !standalone || done || state !== 'off' || !canAsk) return null
+  const permission = typeof Notification !== 'undefined' ? Notification.permission : 'denied'
+  const canAsk = permission === 'default' || permission === 'granted'
+  if (!enabled || !user || state !== 'off' || !canAsk) return null
+  if (isOptedOut(user.id) || snoozedUntil(user.id) > Date.now()) return null
 
-  function finish() {
-    try {
-      localStorage.setItem(SEEN_KEY, '1') // ask once only
-    } catch {
-      /* storage blocked: it may ask again next time */
-    }
-    setDone(true)
+  const userId = user.id
+
+  function notNow() {
+    snooze(userId)
+    setTick((n) => n + 1)
   }
 
   async function turnOn() {
+    // On success the state becomes "on" and this prompt disappears by itself.
+    // If the person closes the browser pop-up without choosing, the prompt simply stays so they can try again.
     await enable()
-    finish()
   }
 
   return (
@@ -63,7 +82,7 @@ export default function NotificationPrompt({ enabled }: { enabled: boolean }) {
             Turn on notifications
           </button>
           <button
-            onClick={finish}
+            onClick={notNow}
             disabled={busy}
             className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 hover:border-brand"
           >
