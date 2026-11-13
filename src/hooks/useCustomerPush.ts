@@ -77,10 +77,10 @@ export function useCustomerPush() {
 
       setOptedOut(user.id, false)
       setState('on')
-      toast.success("Order updates are on. We'll notify you as your order moves.")
+      toast.success("Notifications turned on.")
       return true
     } catch (err) {
-      toast.error(`Couldn't turn on notifications: ${(err as Error).message}`)
+      toast.error(`Couldn't turn on notifications}`)
       return false
     } finally {
       setBusy(false)
@@ -99,7 +99,7 @@ export function useCustomerPush() {
       }
       if (user) setOptedOut(user.id, true) // they chose this: don't ask again
       setState('off')
-      toast.success('Order updates are off on this device')
+      toast.success('Notifications turned off')
     } catch (err) {
       toast.error((err as Error).message)
     } finally {
