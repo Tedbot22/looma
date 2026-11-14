@@ -26,7 +26,7 @@ export default function Auth({ mode }: { mode: 'login' | 'signup' }) {
   const isSignup = mode === 'signup'
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const { user } = useAuth()
+  const { user, loading, likelyLoggedIn } = useAuth()
   const next = safeNext(params.get('next'))
 
   const [fullName, setFullName] = useState('')
@@ -37,8 +37,9 @@ export default function Auth({ mode }: { mode: 'login' | 'signup' }) {
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
-  // Already logged in? Skip this page.
+  // Already logged in? Skip this page. While we are still confirming it, show nothing rather than flashing the form.
   if (user) return <Navigate to={next} replace />
+  if (loading && likelyLoggedIn) return <p className="py-20 text-center text-gray-400">Loading…</p>
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()

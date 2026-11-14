@@ -25,7 +25,6 @@ export default function ProductDetails({ product }: { product: ProductWithVarian
     ['Colours', colours.join(', ')],
     ['Sizes', sizes.join(', ')],
     ['Availability', availability],
-    ['Listed', new Date(product.created_at).toLocaleDateString('en-NG', { dateStyle: 'medium' })],
     ['Item ID', product.id.slice(0, 8).toUpperCase()],
   ].filter((row): row is [string, string] => row[1] !== '')
 

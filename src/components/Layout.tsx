@@ -44,7 +44,7 @@ export default function Layout() {
   const { count } = useCart()
   const { data: profile } = useProfile()
   useRealtimeStock() // items flip to "Sold out" live, without a refresh
-  const { user } = useAuth()
+  const { likelyLoggedIn } = useAuth()
   const [params] = useSearchParams()
 
   // Invite links look like https://yourstore.com/?ref=AB12CD34.
@@ -88,7 +88,7 @@ export default function Layout() {
                 Admin
               </NavLink>
             )}
-            {user ? (
+            {likelyLoggedIn ? (
               <Link to="/account" aria-label="Your account" className="text-brand">
                 <User size={22} />
               </Link>

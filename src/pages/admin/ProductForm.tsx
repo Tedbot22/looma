@@ -3,26 +3,68 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ImagePlus, Plus, Star, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { supabase } from '../../lib/supabase'
-import { uploadProductImage } from '../../lib/images'
-import { PRODUCT_PHOTO_HINT } from '../../lib/layout'
-import type { Category, Product, ProductVariant } from '../../lib/types'
+import { supabase } from '../../../../looma/src/lib/supabase'
+import { uploadProductImage } from '../../../../looma/src/lib/images'
+import { PRODUCT_PHOTO_HINT } from '../../../../looma/src/lib/layout'
+import type { Category, Product, ProductVariant } from '../../../../looma/src/lib/types'
 
 interface Props {
   // Present when editing; absent when adding a new product.
   initial?: { product: Product; variants: ProductVariant[] }
 }
 
-interface VariantRow {
+// One size of one colour. Each of these is a row in product_variants.
+interface SizeRow {
   key: string // local-only id so React can track rows
   id?: string // database id (existing variants only)
-  color: string
   size: string
   stock: string
-  removed?: boolean
+}
+
+// A colour and all the sizes you have in it. Leave the colour blank for items without colours.
+interface ColorGroup {
+  key: string
+  color: string
+  sizes: SizeRow[]
 }
 
 const MAX_IMAGES = 6
+const QUICK_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
+
+// The product details you typed last time are kept on this device and pre-filled for the next product.
+const LAST_DETAILS_KEY = 'looma:last-product-details'
+function readLastDetails(): string {
+  try {
+    return localStorage.getItem(LAST_DETAILS_KEY) ?? ''
+  } catch {
+    return '' // storage blocked: the box just starts empty
+  }
+}
+function rememberDetails(text: string) {
+  try {
+    localStorage.setItem(LAST_DETAILS_KEY, text)
+  } catch {
+    /* not important enough to block saving */
+  }
+}
+
+const newSize = (size = ''): SizeRow => ({ key: crypto.randomUUID(), size, stock: '1' })
+const newGroup = (): ColorGroup => ({ key: crypto.randomUUID(), color: '', sizes: [newSize()] })
+
+// Turns the saved variants (one per colour/size) into colour groups for editing.
+function groupVariants(variants: ProductVariant[]): ColorGroup[] {
+  const groups: ColorGroup[] = []
+  for (const v of variants.filter((x) => x.is_active)) {
+    const color = (v.color ?? '').trim()
+    let group = groups.find((g) => g.color.trim().toLowerCase() === color.toLowerCase())
+    if (!group) {
+      group = { key: crypto.randomUUID(), color, sizes: [] }
+      groups.push(group)
+    }
+    group.sizes.push({ key: v.id, id: v.id, size: v.size ?? '', stock: String(v.stock) })
+  }
+  return groups.length > 0 ? groups : [newGroup()]
+}
 
 const inputClass =
   'w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-brand'
@@ -36,7 +78,7 @@ export default function ProductForm({ initial }: Props) {
 
   const [name, setName] = useState(initial?.product.name ?? '')
   const [description, setDescription] = useState(initial?.product.description ?? '')
-  const [details, setDetails] = useState(initial?.product.details ?? '')
+  const [details, setDetails] = useState(initial ? (initial.product.details ?? '') : readLastDetails())
   const [categoryId, setCategoryId] = useState(initial?.product.category_id ?? '')
   const [price, setPrice] = useState(initial ? String(initial.product.price) : '')
   const [compareAt, setCompareAt] = useState(
@@ -44,19 +86,9 @@ export default function ProductForm({ initial }: Props) {
   )
   const [images, setImages] = useState<string[]>(initial?.product.images ?? [])
   const [isActive, setIsActive] = useState(initial?.product.is_active ?? true)
-  const [rows, setRows] = useState<VariantRow[]>(() =>
-    initial
-      ? initial.variants
-          .filter((v) => v.is_active)
-          .map((v) => ({
-            key: v.id,
-            id: v.id,
-            color: v.color ?? '',
-            size: v.size ?? '',
-            stock: String(v.stock),
-          }))
-      : [{ key: crypto.randomUUID(), color: '', size: '', stock: '1' }]
-  )
+  const [groups, setGroups] = useState<ColorGroup[]>(() => (initial ? groupVariants(initial.variants) : [newGroup()]))
+  // Saved variants the admin removed in this session; they are deleted (or hidden) on save.
+  const [deletedIds, setDeletedIds] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -96,16 +128,41 @@ export default function ProductForm({ initial }: Props) {
   const removeImage = (url: string) => setImages((prev) => prev.filter((u) => u !== url))
 
   // ---------- variants ----------
-  const visibleRows = rows.filter((r) => !r.removed)
-  const updateRow = (key: string, patch: Partial<VariantRow>) =>
-    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)))
-  const addRow = () =>
-    setRows((prev) => [...prev, { key: crypto.randomUUID(), color: '', size: '', stock: '1' }])
-  // Rows that exist in the database are marked removed (deleted on save); new rows just vanish.
-  const removeRow = (row: VariantRow) =>
-    setRows((prev) =>
-      row.id ? prev.map((r) => (r.key === row.key ? { ...r, removed: true } : r)) : prev.filter((r) => r.key !== row.key)
+  const allSizeRows = groups.flatMap((g) => g.sizes)
+  const updateGroup = (key: string, patch: Partial<ColorGroup>) =>
+    setGroups((prev) => prev.map((g) => (g.key === key ? { ...g, ...patch } : g)))
+  const updateSize = (groupKey: string, rowKey: string, patch: Partial<SizeRow>) =>
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.key === groupKey ? { ...g, sizes: g.sizes.map((r) => (r.key === rowKey ? { ...r, ...patch } : r)) } : g
+      )
     )
+  const addSize = (groupKey: string, size = '') =>
+    setGroups((prev) =>
+      prev.map((g) => {
+        if (g.key !== groupKey) return g
+        // A quick-pick fills the empty starter row instead of adding a second one.
+        const blank = size ? g.sizes.find((r) => !r.id && !r.size.trim() && g.sizes.length === 1) : undefined
+        if (blank) return { ...g, sizes: [{ ...blank, size }] }
+        return { ...g, sizes: [...g.sizes, newSize(size)] }
+      })
+    )
+  const addGroup = () => setGroups((prev) => [...prev, newGroup()])
+
+  // Rows that exist in the database are remembered so save can delete them; new rows just vanish.
+  const removeSize = (group: ColorGroup, row: SizeRow) => {
+    if (row.id) setDeletedIds((prev) => [...prev, row.id!])
+    setGroups((prev) =>
+      prev
+        .map((g) => (g.key === group.key ? { ...g, sizes: g.sizes.filter((r) => r.key !== row.key) } : g))
+        .filter((g) => g.sizes.length > 0) // a colour with no sizes left disappears
+    )
+  }
+  const removeGroup = (group: ColorGroup) => {
+    const ids = group.sizes.map((r) => r.id).filter((id): id is string => !!id)
+    if (ids.length) setDeletedIds((prev) => [...prev, ...ids])
+    setGroups((prev) => prev.filter((g) => g.key !== group.key))
+  }
 
   // ---------- validation ----------
   function validate(): string | null {
@@ -117,15 +174,17 @@ export default function ProductForm({ initial }: Props) {
       const c = Number(compareAt)
       if (Number.isNaN(c) || c <= p) return 'The original price must be higher than the current price.'
     }
-    if (visibleRows.length === 0) return 'Add at least one option (even a single "no color / no size" row).'
+    if (allSizeRows.length === 0) return 'Add at least one option (even a single "no color / no size" row).'
 
     const seen = new Set<string>()
-    for (const r of visibleRows) {
-      const s = Number(r.stock)
-      if (r.stock === '' || !Number.isInteger(s) || s < 0) return 'Stock must be a whole number, 0 or more.'
-      const combo = `${r.color.trim().toLowerCase()}|${r.size.trim().toLowerCase()}`
-      if (seen.has(combo)) return 'Two options have the same color and size.'
-      seen.add(combo)
+    for (const g of groups) {
+      for (const r of g.sizes) {
+        const s = Number(r.stock)
+        if (r.stock === '' || !Number.isInteger(s) || s < 0) return 'Stock must be a whole number, 0 or more.'
+        const combo = `${g.color.trim().toLowerCase()}|${r.size.trim().toLowerCase()}`
+        if (seen.has(combo)) return 'Two options have the same color and size.'
+        seen.add(combo)
+      }
     }
     return null
   }
@@ -162,33 +221,38 @@ export default function ProductForm({ initial }: Props) {
         productId = data.id
       }
 
-      for (const row of rows) {
-        if (row.removed) {
-          if (!row.id) continue
-          const { error } = await supabase.from('product_variants').delete().eq('id', row.id)
-          // 23503 = it's part of a past order. We keep the history and simply hide the option.
-          if (error?.code === '23503') {
-            await supabase.from('product_variants').update({ is_active: false, stock: 0 }).eq('id', row.id)
-          } else if (error) {
-            throw error
-          }
-          continue
-        }
-
-        const values = {
-          color: row.color.trim() || null,
-          size: row.size.trim() || null,
-          stock: Number(row.stock),
-          is_active: true,
-        }
-        if (row.id) {
-          const { error } = await supabase.from('product_variants').update(values).eq('id', row.id)
-          if (error) throw error
-        } else {
-          const { error } = await supabase.from('product_variants').insert({ ...values, product_id: productId })
-          if (error) throw error
+      // Options removed in the form: delete them, or hide them if a past order uses them.
+      for (const id of deletedIds) {
+        const { error } = await supabase.from('product_variants').delete().eq('id', id)
+        // 23503 = it's part of a past order. We keep the history and simply hide the option.
+        if (error?.code === '23503') {
+          await supabase.from('product_variants').update({ is_active: false, stock: 0 }).eq('id', id)
+        } else if (error) {
+          throw error
         }
       }
+      setDeletedIds([])
+
+      for (const group of groups) {
+        for (const row of group.sizes) {
+          const values = {
+            color: group.color.trim() || null,
+            size: row.size.trim() || null,
+            stock: Number(row.stock),
+            is_active: true,
+          }
+          if (row.id) {
+            const { error } = await supabase.from('product_variants').update(values).eq('id', row.id)
+            if (error) throw error
+          } else {
+            const { error } = await supabase.from('product_variants').insert({ ...values, product_id: productId })
+            if (error) throw error
+          }
+        }
+      }
+
+      // Remembered so the next new product starts with the same details.
+      rememberDetails(details.trim())
 
       // Make the storefront and admin lists show fresh data.
       await Promise.all(
@@ -310,7 +374,17 @@ export default function ProductForm({ initial }: Props) {
             <p className="mt-1 text-xs text-gray-500">
               Shown as a list on the product page, with the category, colours, sizes and availability added
               automatically.
+              {isNew && ' The details from your last product are filled in for you, so edit them if this item is different.'}
             </p>
+            {isNew && details && (
+              <button
+                type="button"
+                onClick={() => setDetails('')}
+                className="mt-1 text-xs font-medium text-brand hover:underline"
+              >
+                Clear details
+              </button>
+            )}
           </div>
           <div>
             <label className={labelClass}>Category</label>
@@ -354,51 +428,95 @@ export default function ProductForm({ initial }: Props) {
 
         {/* Variants */}
         <section>
-          <p className={labelClass}>Options and stock</p>
+          <p className={labelClass}>Colors, sizes and stock</p>
           <p className="mb-3 text-xs text-gray-500">
-            One row per color/size you have. For an item with only one version, leave color and size blank.
+            Add a color, then every size you have in it. Leave the color blank if the item has no color options, and
+            leave the size blank if it has no sizes.
           </p>
 
-          <div className="space-y-2">
-            {visibleRows.map((row) => (
-              <div key={row.key} className="grid grid-cols-[1fr_1fr_5rem_auto] items-center gap-2">
-                <input
-                  className={inputClass}
-                  placeholder="Color"
-                  value={row.color}
-                  onChange={(e) => updateRow(row.key, { color: e.target.value })}
-                />
-                <input
-                  className={inputClass}
-                  placeholder="Size"
-                  value={row.size}
-                  onChange={(e) => updateRow(row.key, { size: e.target.value })}
-                />
-                <input
-                  className={inputClass}
-                  placeholder="Stock"
-                  inputMode="numeric"
-                  value={row.stock}
-                  onChange={(e) => updateRow(row.key, { stock: e.target.value })}
-                />
-                <button
-                  type="button"
-                  aria-label="Remove option"
-                  onClick={() => removeRow(row)}
-                  className="p-2 text-gray-400 hover:text-sale"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
+          <div className="space-y-4">
+            {groups.map((group) => {
+              const taken = new Set(group.sizes.map((r) => r.size.trim().toLowerCase()))
+              const quick = QUICK_SIZES.filter((q) => !taken.has(q.toLowerCase()))
+              return (
+                <div key={group.key} className="rounded-xl border border-gray-200 p-3">
+                  <div className="mb-3 flex items-center gap-2">
+                    <input
+                      className={inputClass}
+                      placeholder="Color (optional)"
+                      value={group.color}
+                      onChange={(e) => updateGroup(group.key, { color: e.target.value })}
+                    />
+                    {groups.length > 1 && (
+                      <button
+                        type="button"
+                        aria-label="Remove this color"
+                        onClick={() => removeGroup(group)}
+                        className="p-2 text-gray-400 hover:text-sale"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    {group.sizes.map((row) => (
+                      <div key={row.key} className="grid grid-cols-[1fr_5rem_auto] items-center gap-2">
+                        <input
+                          className={inputClass}
+                          placeholder="Size (e.g. M, 42)"
+                          value={row.size}
+                          onChange={(e) => updateSize(group.key, row.key, { size: e.target.value })}
+                        />
+                        <input
+                          className={inputClass}
+                          placeholder="Stock"
+                          inputMode="numeric"
+                          value={row.stock}
+                          onChange={(e) => updateSize(group.key, row.key, { stock: e.target.value })}
+                        />
+                        <button
+                          type="button"
+                          aria-label="Remove size"
+                          onClick={() => removeSize(group, row)}
+                          className="p-2 text-gray-400 hover:text-sale"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {quick.map((q) => (
+                      <button
+                        key={q}
+                        type="button"
+                        onClick={() => addSize(group.key, q)}
+                        className="rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 hover:border-brand hover:text-brand"
+                      >
+                        + {q}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => addSize(group.key)}
+                      className="flex items-center gap-1 text-xs font-medium text-brand hover:underline"
+                    >
+                      <Plus size={12} /> Other size
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
           </div>
 
           <button
             type="button"
-            onClick={addRow}
+            onClick={addGroup}
             className="mt-3 flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"
           >
-            <Plus size={14} /> Add another option
+            <Plus size={14} /> Add another color
           </button>
         </section>
 
