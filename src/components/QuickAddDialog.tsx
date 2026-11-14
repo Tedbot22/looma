@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart } from '../context/CartContext'
-import { toCartItem, variantLabel } from '../lib/variants'
+import { toCartItem } from '../lib/variants'
+import VariantPicker from './VariantPicker'
 import PriceTag from './PriceTag'
 import type { ProductVariant, ProductWithVariants } from '../lib/types'
 
@@ -54,22 +55,11 @@ export default function QuickAddDialog({ product, variants, onClose }: Props) {
           </button>
         </div>
 
-        <p className="mb-2 mt-4 text-sm font-medium">Choose an option</p>
-        <div className="flex flex-wrap gap-2">
-          {variants.map((v) => (
-            <button
-              key={v.id}
-              onClick={() => setSelectedId(v.id)}
-              className={`rounded-lg border px-4 py-2 text-sm font-medium ${
-                v.id === selected.id ? 'border-brand bg-brand text-white' : 'border-gray-200 hover:border-brand'
-              }`}
-            >
-              {variantLabel(v)}
-            </button>
-          ))}
+        <div className="mt-4">
+          <VariantPicker product={product} variants={variants} selectedId={selected.id} onSelect={setSelectedId} />
         </div>
         {selected.stock <= 3 && (
-          <p className="mt-2 text-sm font-medium text-amber-600">
+          <p className="mt-3 text-sm font-medium text-amber-600">
             {selected.stock === 1 ? 'Only 1 left' : `Only ${selected.stock} left`}
           </p>
         )}

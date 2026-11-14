@@ -17,6 +17,8 @@ export interface Product {
   compare_at_price: number | null
   images: string[]
   is_active: boolean
+  // Which size chart the product page offers. null = work it out from the category name.
+  size_guide?: 'clothing' | 'shoes' | 'none' | null
   created_at: string
 }
 

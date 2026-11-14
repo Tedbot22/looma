@@ -25,6 +25,7 @@ interface SizeRow {
 interface ColorGroup {
   key: string
   color: string
+  image: string | null // one of the product's photos, shown as this colour's swatch on the store
   sizes: SizeRow[]
 }
 
@@ -49,7 +50,7 @@ function rememberDetails(text: string) {
 }
 
 const newSize = (size = ''): SizeRow => ({ key: crypto.randomUUID(), size, stock: '1' })
-const newGroup = (): ColorGroup => ({ key: crypto.randomUUID(), color: '', sizes: [newSize()] })
+const newGroup = (): ColorGroup => ({ key: crypto.randomUUID(), color: '', image: null, sizes: [newSize()] })
 
 // Turns the saved variants (one per colour/size) into colour groups for editing.
 function groupVariants(variants: ProductVariant[]): ColorGroup[] {
@@ -58,7 +59,7 @@ function groupVariants(variants: ProductVariant[]): ColorGroup[] {
     const color = (v.color ?? '').trim()
     let group = groups.find((g) => g.color.trim().toLowerCase() === color.toLowerCase())
     if (!group) {
-      group = { key: crypto.randomUUID(), color, sizes: [] }
+      group = { key: crypto.randomUUID(), color, image: v.image ?? null, sizes: [] }
       groups.push(group)
     }
     group.sizes.push({ key: v.id, id: v.id, size: v.size ?? '', stock: String(v.stock) })
@@ -85,6 +86,7 @@ export default function ProductForm({ initial }: Props) {
     initial?.product.compare_at_price ? String(initial.product.compare_at_price) : ''
   )
   const [images, setImages] = useState<string[]>(initial?.product.images ?? [])
+  const [sizeGuide, setSizeGuide] = useState<string>(initial?.product.size_guide ?? '') // '' = automatic
   const [isActive, setIsActive] = useState(initial?.product.is_active ?? true)
   const [groups, setGroups] = useState<ColorGroup[]>(() => (initial ? groupVariants(initial.variants) : [newGroup()]))
   // Saved variants the admin removed in this session; they are deleted (or hidden) on save.
@@ -125,7 +127,10 @@ export default function ProductForm({ initial }: Props) {
   }
 
   const makeCover = (url: string) => setImages((prev) => [url, ...prev.filter((u) => u !== url)])
-  const removeImage = (url: string) => setImages((prev) => prev.filter((u) => u !== url))
+  const removeImage = (url: string) => {
+    setImages((prev) => prev.filter((u) => u !== url))
+    setGroups((prev) => prev.map((g) => (g.image === url ? { ...g, image: null } : g)))
+  }
 
   // ---------- variants ----------
   const allSizeRows = groups.flatMap((g) => g.sizes)
@@ -209,6 +214,7 @@ export default function ProductForm({ initial }: Props) {
         price: Number(price),
         compare_at_price: compareAt ? Number(compareAt) : null,
         images,
+        size_guide: sizeGuide || null,
         is_active: isActive,
       }
 
@@ -239,6 +245,7 @@ export default function ProductForm({ initial }: Props) {
             color: group.color.trim() || null,
             size: row.size.trim() || null,
             stock: Number(row.stock),
+            image: group.color.trim() ? group.image : null,
             is_active: true,
           }
           if (row.id) {
@@ -397,6 +404,17 @@ export default function ProductForm({ initial }: Props) {
               ))}
             </select>
           </div>
+          <div>
+            <label className={labelClass}>
+              Size guide <span className="font-normal text-gray-400">(shown next to the sizes)</span>
+            </label>
+            <select className={inputClass} value={sizeGuide} onChange={(e) => setSizeGuide(e.target.value)}>
+              <option value="">Automatic (based on the category)</option>
+              <option value="clothing">Clothing size guide</option>
+              <option value="shoes">Shoe size guide</option>
+              <option value="none">No size guide (perfumes, bags, accessories)</option>
+            </select>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>Price (₦)</label>
@@ -458,6 +476,30 @@ export default function ProductForm({ initial }: Props) {
                       </button>
                     )}
                   </div>
+
+                  {group.color.trim() && images.length > 0 && (
+                    <div className="mb-3">
+                      <p className="mb-1.5 text-xs text-gray-500">
+                        Photo for this color <span className="text-gray-400">(shown as its swatch; tap again to clear)</span>
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {images.map((url) => (
+                          <button
+                            key={url}
+                            type="button"
+                            aria-label="Use this photo for the color"
+                            aria-pressed={group.image === url}
+                            onClick={() => updateGroup(group.key, { image: group.image === url ? null : url })}
+                            className={`h-14 w-11 overflow-hidden rounded-md border-2 ${
+                              group.image === url ? 'border-brand' : 'border-transparent opacity-70 hover:opacity-100'
+                            }`}
+                          >
+                            <img src={url} alt="" className="h-full w-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     {group.sizes.map((row) => (

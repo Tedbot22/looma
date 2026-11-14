@@ -13,6 +13,7 @@ import { useCart } from '../context/CartContext'
 import { useWishlist } from '../context/WishlistContext'
 import PriceTag from '../components/PriceTag'
 import ImageCarousel from '../components/ImageCarousel'
+import VariantPicker from '../components/VariantPicker'
 import ProductDetails from '../components/ProductDetails'
 import YouMayAlsoLike from '../components/YouMayAlsoLike'
 import StoreReviewsLink from '../components/StoreReviewsLink'
@@ -129,7 +130,7 @@ export default function ProductPage() {
     name: product.name,
     variantLabel: variantLabel(active),
     price: product.price,
-    image: product.images[0] ?? null,
+    image: active.image || (product.images[0] ?? null),
     maxStock: active.stock,
   }
 
@@ -187,7 +188,7 @@ export default function ProductPage() {
 
       <div className="grid gap-5 sm:gap-8 md:grid-cols-2">
         {/* Gallery: a swipeable carousel */}
-        <ImageCarousel images={product.images} alt={product.name}>
+        <ImageCarousel images={product.images} alt={product.name} focus={active?.image}>
           {percentOff && !soldOut && (
             <span className="absolute left-3 top-3 rounded-full bg-sale px-3 py-1 text-sm font-semibold text-white">
               -{percentOff}%
@@ -211,34 +212,12 @@ export default function ProductPage() {
 
           {product.description && <p className="text-gray-600">{product.description}</p>}
 
-          {/* Variant picker: out-of-stock options are visible but disabled */}
+          {/* Colour and size picker. Out-of-stock choices are visible but disabled. */}
           {variants.length > 0 && (
             <div>
-              <p className="mb-2 text-sm font-medium">Options</p>
-              <div className="flex flex-wrap gap-2">
-                {variants.map((v) => {
-                  const out = v.stock === 0
-                  const selected = v.id === active?.id
-                  return (
-                    <button
-                      key={v.id}
-                      disabled={out}
-                      onClick={() => setSelectedId(v.id)}
-                      className={`min-h-10 rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors sm:px-4 ${
-                        out
-                          ? 'cursor-not-allowed border-gray-100 text-gray-300 line-through'
-                          : selected
-                            ? 'border-brand bg-brand text-white'
-                            : 'border-gray-200 hover:border-brand'
-                      }`}
-                    >
-                      {variantLabel(v)}
-                    </button>
-                  )
-                })}
-              </div>
+              <VariantPicker product={product} variants={variants} selectedId={active?.id} onSelect={setSelectedId} />
               {active && active.stock <= 3 && (
-                <p className="mt-2 text-sm font-medium text-amber-600">
+                <p className="mt-3 text-sm font-medium text-amber-600">
                   {active.stock === 1 ? 'Only 1 left' : `Only ${active.stock} left`}
                 </p>
               )}

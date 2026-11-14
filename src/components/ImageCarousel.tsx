@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, ImageOff } from 'lucide-react'
 
 // The photo frame. On phones it is a little shorter than the card shape (4:5), never taller than 70% of the
@@ -11,11 +11,12 @@ interface Props {
   images: string[]
   alt: string
   children?: ReactNode // badges drawn on top of the photo, e.g. "-25%"
+  focus?: string | null // when this changes to one of the photos, the carousel slides to it (e.g. a picked colour)
 }
 
 // A swipeable photo carousel. On phones you just swipe (the browser does the work through
 // CSS scroll-snap). On desktop there are arrow buttons. Dots show where you are.
-export default function ImageCarousel({ images, alt, children }: Props) {
+export default function ImageCarousel({ images, alt, children, focus }: Props) {
   const scroller = useRef<HTMLDivElement>(null)
   const [index, setIndex] = useState(0)
 
@@ -30,6 +31,18 @@ export default function ImageCarousel({ images, alt, children }: Props) {
     const target = Math.max(0, Math.min(images.length - 1, i))
     el.scrollTo({ left: target * el.clientWidth, behavior: 'smooth' })
   }
+
+  // Slide to the picked colour's photo, but not on the first paint (that would scroll for no reason).
+  const firstFocus = useRef(true)
+  useEffect(() => {
+    if (firstFocus.current) {
+      firstFocus.current = false
+      return
+    }
+    const i = focus ? images.indexOf(focus) : -1
+    if (i >= 0) goTo(i)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus])
 
   function handleKey(e: KeyboardEvent) {
     if (e.key === 'ArrowLeft') goTo(index - 1)

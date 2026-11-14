@@ -1,5 +1,5 @@
 import type { CartItem } from '../context/CartContext'
-import type { ProductVariant, ProductWithVariants } from './types'
+import type { ProductVariant, ProductWithVariants } from '../../../../looma/src/lib/types'
 
 // "Black / M", or "Standard" for items with a single version.
 export function variantLabel(v: Pick<ProductVariant, 'color' | 'size'>): string {
@@ -14,7 +14,7 @@ export function toCartItem(product: ProductWithVariants, variant: ProductVariant
     name: product.name,
     variantLabel: variantLabel(variant),
     price: product.price,
-    image: product.images[0] ?? null,
+    image: variant.image || (product.images[0] ?? null),
     maxStock: variant.stock,
   }
 }
