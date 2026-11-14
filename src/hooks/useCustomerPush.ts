@@ -80,7 +80,7 @@ export function useCustomerPush() {
       toast.success("Notifications turned on.")
       return true
     } catch (err) {
-      toast.error(`Couldn't turn on notifications}`)
+      toast.error(`Couldn't turn on notifications`)
       return false
     } finally {
       setBusy(false)
