@@ -17,9 +17,27 @@ function hash(text: string): number {
   return h >>> 0
 }
 
+// A steady "random" number strictly between 0 and 1 for one item and one seed.
+export function seededUnit(seed: number, id: string): number {
+  return (hash(`${seed}:${id}`) + 1) / 4294967297
+}
+
 export function shuffleBySeed<T extends { id: string }>(items: T[], seed: number): T[] {
   return items
     .map((item) => ({ item, key: hash(`${seed}:${item.id}`) }))
+    .sort((a, b) => a.key - b.key)
+    .map((x) => x.item)
+}
+
+// A weighted shuffle: every item can land anywhere, but items with a bigger weight are much more likely to
+// land near the front. Same seed + same items = same order (so a page stays steady while it's open).
+// (Each item "races" with time -ln(u) / weight, where u is a steady random number worked out from seed + id.)
+export function weightedShuffle<T extends { id: string }>(items: T[], weight: (item: T) => number, seed: number): T[] {
+  return items
+    .map((item) => {
+      const u = seededUnit(seed, item.id)
+      return { item, key: -Math.log(u) / Math.max(weight(item), 1e-6) }
+    })
     .sort((a, b) => a.key - b.key)
     .map((x) => x.item)
 }

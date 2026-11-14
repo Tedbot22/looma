@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { NavLink, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatNaira } from '../lib/format'
 import { searchProducts } from '../lib/search'
-import { shuffleBySeed } from '../lib/shuffle'
+import { shopOrder } from '../lib/productOrder'
 import { pageTitle, useSeo } from '../lib/seo'
 import { STORE_NAME } from '../config'
 import ProductCard from '../components/ProductCard'
@@ -132,12 +132,13 @@ export default function Shop() {
     },
   })
 
-  // With a search, show only the matches, best match first. Without one, show everything in a fresh random
-  // order each time the shop opens (the same order is kept while you stay, so items don't jump around).
-  const products = useMemo(
-    () => (term && allProducts ? searchProducts(allProducts, term).map((h) => h.item) : allProducts && shuffleBySeed(allProducts, shuffleSeed)),
-    [term, allProducts, shuffleSeed]
-  )
+  // With a search, show only the matches, best match first. Without one, show everything in a fresh order each
+  // time the shop opens: newer and discounted items are favoured, with some older stock mixed in. The same order
+  // is kept while you stay, so items don't jump around.
+  const products =
+    term && allProducts
+      ? searchProducts(allProducts, term).map((h) => h.item)
+      : allProducts && shopOrder(allProducts, shuffleSeed)
 
   const filtering = term !== '' || hasPrice
 

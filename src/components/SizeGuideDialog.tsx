@@ -194,18 +194,6 @@ export default function SizeGuideDialog({ kind, productName, onClose }: Props) {
                 <li>Hips: around the fullest part of your hips.</li>
               </ul>
             )}
-            <p className="pt-1 text-xs text-gray-500">
-              A general guide only. These are pre-owned pieces and brands fit differently, so ask us if you want the
-              exact measurements of this item.
-            </p>
-            <a
-              href={whatsappLink(`Hi! Please can you send me the exact measurements for "${productName}"?`)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block text-sm font-medium text-brand underline"
-            >
-              Ask for this item's measurements
-            </a>
           </div>
         </div>
       </div>

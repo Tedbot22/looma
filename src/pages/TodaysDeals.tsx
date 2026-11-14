@@ -1,8 +1,8 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useProductPool } from '../hooks/useRecommendations'
-import { todaysDealsList } from '../lib/todaysDeals'
+import { randomSeed, todaysDealsList } from '../lib/todaysDeals'
 import ProductCard from '../components/ProductCard'
 import { PRODUCT_GRID } from '../lib/layout'
 import { ProductGridSkeleton } from '../components/Skeleton'
@@ -11,7 +11,8 @@ import { ProductGridSkeleton } from '../components/Skeleton'
 // random picks, then a daily mix of recent and older stock.
 export default function TodaysDeals() {
   const pool = useProductPool()
-  const items = useMemo(() => (pool.data ? todaysDealsList(pool.data) : []), [pool.data])
+  const [seed] = useState(randomSeed) // a new order each time the page opens
+  const items = useMemo(() => (pool.data ? todaysDealsList(pool.data, seed) : []), [pool.data, seed])
 
   return (
     <div>

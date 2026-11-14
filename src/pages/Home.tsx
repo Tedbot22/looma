@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -9,7 +9,7 @@ import HeroCarousel, { type Banner } from '../components/HeroCarousel'
 import ProductCard from '../components/ProductCard'
 import { CategoryRowSkeleton, HeroSkeleton, ProductCardSkeleton } from '../components/Skeleton'
 import type { Category, ProductWithVariants } from '../lib/types'
-import { todaysDealsList } from '../lib/todaysDeals'
+import { randomSeed, todaysDealsList } from '../lib/todaysDeals'
 import { STORE_NAME } from '../config'
 import { FULL_BLEED } from '../lib/layout'
 
@@ -104,7 +104,8 @@ export default function Home() {
   const recommended = useRecommendations(ROW_MAX * 2)
 
   // Today's deals: a mix of fresh arrivals, big markdowns and random picks. Always the top row.
-  const deals = useMemo(() => (pool.data ? todaysDealsList(pool.data).slice(0, ROW_MAX) : []), [pool.data])
+  const [dealsSeed] = useState(randomSeed) // the deals row reshuffles each time Home opens
+  const deals = useMemo(() => (pool.data ? todaysDealsList(pool.data, dealsSeed).slice(0, ROW_MAX) : []), [pool.data, dealsSeed])
   const dealIds = new Set(deals.map((p) => p.id))
 
   // Recommended for you: personal picks once the customer has interacted with items, random items before
