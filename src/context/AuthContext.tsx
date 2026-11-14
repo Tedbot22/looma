@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
-import { supabase } from '../../../looma/src/lib/supabase'
-import { detachThisDevice } from '../../../looma/src/lib/push'
+import { supabase } from '../../src/lib/supabase'
+import { detachThisDevice } from '../../src/lib/push'
 
 interface AuthContextValue {
   user: User | null

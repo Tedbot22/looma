@@ -4,9 +4,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ImagePlus, Plus, Star, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../../../looma/src/lib/supabase'
-import { uploadProductImage } from '../../../../looma/src/lib/images'
-import { PRODUCT_PHOTO_HINT } from '../../../../looma/src/lib/layout'
-import type { Category, Product, ProductVariant } from '../../../../looma/src/lib/types'
+import { uploadProductImage } from '../../lib/images'
+import { PRODUCT_PHOTO_HINT } from '../../lib/layout'
+import type { Category, Product, ProductVariant } from '../../lib/types'
 
 interface Props {
   // Present when editing; absent when adding a new product.
