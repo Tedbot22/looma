@@ -295,7 +295,7 @@ export async function applyRefundEvent(eventName: string, data: any) {
 
   if (!row) {
     // A refund we did not start (made in the Paystack dashboard). Our references look like ord-<order id>-<time>.
-    orderId = reference.match(/^ord-([0-9a-f-]{36})-\d+$/)?.[1] ?? null
+    orderId = reference.match(/^(?:ord|cod)-([0-9a-f-]{36})-\d+$/)?.[1] ?? null
     await admin.from('payments').insert({ order_id: orderId, kind: 'refund', reference, status, reason: 'Started outside the app', raw: data })
   } else {
     await admin
@@ -436,4 +436,84 @@ export async function verifyAndMarkPaid(orderId: string, reference: string): Pro
   }
 
   return { status: 'error', message: 'Could not update the order' }
+}
+
+// ---------------------------------------------------------------------
+// Pay-on-delivery orders paid by bank transfer to a rider-generated account
+// ---------------------------------------------------------------------
+// References look like cod-<order id>-<time> (online orders use ord-...). Same rule as above:
+// believe Paystack, never the browser. Safe to run more than once (webhook + the rider page's check).
+export async function verifyAndMarkTransferPaid(orderId: string, reference: string): Promise<VerifyResult> {
+  if (!reference.startsWith(`cod-${orderId}-`)) {
+    return { status: 'error', message: 'That payment does not belong to this order' }
+  }
+
+  const { data: order } = await admin
+    .from('orders')
+    .select('id, order_number, total, status, payment_method, payment_status, payment_reference')
+    .eq('id', orderId)
+    .single()
+  if (!order) return { status: 'error', message: 'Order not found' }
+  if (order.payment_method !== 'on_delivery') return { status: 'error', message: 'Not a pay-on-delivery order' }
+  if (order.payment_status === 'paid' && order.payment_reference === reference) return { status: 'already_paid' }
+
+  const { ok, body } = await paystack(`/transaction/verify/${encodeURIComponent(reference)}`)
+  if (!ok) return { status: 'error', message: body?.message ?? 'Could not verify the payment' }
+
+  const tx = body.data
+  if (tx.status !== 'success') return { status: 'not_paid' }
+  await recordCharge(orderId, tx)
+
+  const refund = (reason: string) =>
+    refundTransaction({
+      orderId,
+      reference,
+      reason,
+      customerNote: `Refund for order #${order.order_number}: ${reason}`,
+      merchantNote: `Order #${order.order_number} (${orderId}): ${reason}`,
+    })
+  const failed = (r: { status: string }) => r.status === 'failed'
+
+  if (order.payment_status === 'paid') {
+    const r = await refund('duplicate payment')
+    return failed(r) ? { status: 'refund_failed', message: 'Duplicate payment; refund queued for the store.' } : { status: 'duplicate_refunded' }
+  }
+
+  const expected = Math.round(Number(order.total) * 100)
+  if (tx.amount !== expected || tx.currency !== 'NGN' || tx.metadata?.order_id !== orderId) {
+    await openIssue({
+      orderId,
+      reference,
+      kind: 'payment_mismatch',
+      detail: `Transfer for a pay-on-delivery order: paid ${tx.amount} ${tx.currency} (kobo) but the order expects ${expected} NGN. A refund is being started.`,
+      raw: tx,
+    })
+    const r = await refund('the transfer did not match the order amount')
+    return failed(r) ? { status: 'refund_failed', message: 'Mismatch; refund queued for the store.' } : { status: 'mismatch' }
+  }
+
+  if (order.status === 'cancelled') {
+    const r = await refund('the order was cancelled before the transfer arrived')
+    return failed(r) ? { status: 'refund_failed', message: 'Paid after cancellation; refund queued.' } : { status: 'refunded' }
+  }
+
+  // Only flips pending -> paid, so a second caller changes nothing.
+  const { data: marked, error } = await admin
+    .from('orders')
+    .update({ payment_status: 'paid', payment_reference: reference })
+    .eq('id', orderId)
+    .eq('payment_method', 'on_delivery')
+    .eq('payment_status', 'pending')
+    .select('id')
+  if (error) {
+    console.error('Could not mark the order paid:', error)
+    return { status: 'error', message: 'Could not update the order' }
+  }
+
+  await admin
+    .from('rider_transfer_accounts')
+    .update({ status: 'paid', paid_at: new Date().toISOString() })
+    .eq('reference', reference)
+
+  return marked && marked.length > 0 ? { status: 'paid' } : { status: 'already_paid' }
 }

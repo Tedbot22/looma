@@ -4,6 +4,7 @@ import {
   AlertTriangle, Banknote, CheckCircle2, Clock, MapPin, MessageCircle, Navigation, Package, Phone, QrCode,
 } from 'lucide-react'
 import QrScanner from '../components/QrScanner'
+import RiderTransferPay from '../components/RiderTransferPay'
 import { Skeleton } from '../components/Skeleton'
 import { formatNaira } from '../lib/format'
 import { whatsappLink } from '../lib/whatsapp'
@@ -65,6 +66,7 @@ export default function RiderDeliveryPage() {
   const [otpOpen, setOtpOpen] = useState(false)
   const [otpSent, setOtpSent] = useState<{ hint: string | null; resendAtMs: number } | null>(null)
   const [now, setNow] = useState(Date.now())
+  const [paidByTransfer, setPaidByTransfer] = useState(false) // set by RiderTransferPay once the server confirms
   const [otp, setOtp] = useState('')
   const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null)
   const busyRef = useRef(false) // blocks double taps before React re-renders
@@ -312,14 +314,16 @@ export default function RiderDeliveryPage() {
         </p>
       </section>
 
-      {o.amount_to_collect > 0 && (
+      {o.amount_to_collect > 0 && !paidByTransfer && (
         <Banner
           tone="amber"
           icon={<Banknote size={22} />}
           title={`Collect ${formatNaira(o.amount_to_collect)} in cash`}
-          text="This is a pay-on-delivery order."
+          text="This is a pay-on-delivery order. Or let the customer pay by transfer below."
         />
       )}
+
+      <RiderTransferPay token={token} riderStatus={a.status} onPaidChange={setPaidByTransfer} />
 
       {/* Where to */}
       <section className="space-y-2 rounded-xl border border-gray-200 bg-white p-4 text-sm">

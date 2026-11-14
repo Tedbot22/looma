@@ -3,7 +3,7 @@
 // Then in the Paystack dashboard: Settings > API Keys & Webhooks > set the webhook URL to
 //   https://YOUR-PROJECT-REF.supabase.co/functions/v1/paystack-webhook
 // @ts-nocheck
-import { applyRefundEvent, json, openIssue, resolveIssues, verifyAndMarkPaid } from '../_shared/paystack.ts'
+import { admin, applyRefundEvent, json, openIssue, resolveIssues, verifyAndMarkPaid, verifyAndMarkTransferPaid } from '../_shared/paystack.ts'
 
 const toHex = (buf: ArrayBuffer) =>
   [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
@@ -43,12 +43,29 @@ Deno.serve(async (req) => {
       const orderId = event.data?.metadata?.order_id
       const reference = event.data?.reference
       if (orderId && reference) {
-        const result = await verifyAndMarkPaid(String(orderId), String(reference))
+        // cod-... = a pay-on-delivery order paid by transfer to a rider-generated account.
+        const result = String(reference).startsWith('cod-')
+          ? await verifyAndMarkTransferPaid(String(orderId), String(reference))
+          : await verifyAndMarkPaid(String(orderId), String(reference))
         console.log('Webhook result', orderId, result)
         // A 500 makes Paystack retry later. Worth it for a transient failure (we could not reach Paystack,
         // the database hiccupped). Mismatches and failed refunds are already saved for the owner, so
         // those answer 200: retrying cannot fix them.
         if (result.status === 'error') return json({ error: result.message }, 500)
+      }
+    } else if (event.event === 'bank.transfer.rejected') {
+      // The customer sent the wrong amount or was flagged: the rider's account will not accept it.
+      // [verify] payload shape against a real rejected-transfer event.
+      const reference = event.data?.reference ?? event.data?.transaction?.reference ?? null
+      if (reference && String(reference).startsWith('cod-')) {
+        await admin.from('rider_transfer_accounts').update({ status: 'rejected' }).eq('reference', String(reference)).eq('status', 'pending')
+        await openIssue({
+          orderId: event.data?.metadata?.order_id ?? null,
+          reference: String(reference),
+          kind: 'other',
+          detail: 'A bank transfer to a rider-generated account was rejected (wrong amount or flagged). The rider may need to generate a new account or take cash.',
+          raw: event.data,
+        })
       }
     } else if (REFUND_EVENTS.includes(event.event)) {
       await applyRefundEvent(event.event, event.data)

@@ -201,3 +201,28 @@ export const MESSAGES: Record<string, { title: string; text: string }> = {
 }
 
 export const messageFor = (code: string) => MESSAGES[code] ?? MESSAGES.ERROR
+
+// ---------- Pay by transfer (pay-on-delivery orders) ----------
+// The rider asks for a temporary bank account tied to this order. The customer transfers the exact
+// total to it; the server confirms with Paystack. This page never decides whether money arrived.
+export interface TransferAccount {
+  account_number: string
+  account_name: string | null
+  bank_name: string | null
+  amount: number
+  expires_at: string
+}
+
+async function transferCall(token: string, action: 'status' | 'create'): Promise<Reply> {
+  try {
+    const { data, error } = await supabase.functions.invoke('rider-payment-account', { body: { token, action } })
+    if (error || !data || typeof data !== 'object') return { ok: false, code: 'NETWORK' }
+    const reply = data as Record<string, unknown>
+    return { ...reply, ok: reply.ok === true, code: String(reply.code ?? 'ERROR') }
+  } catch {
+    return { ok: false, code: 'NETWORK' }
+  }
+}
+
+export const getTransferState = (token: string) => transferCall(token, 'status')
+export const createTransferAccount = (token: string) => transferCall(token, 'create')

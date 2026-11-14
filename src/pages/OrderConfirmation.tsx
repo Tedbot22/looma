@@ -350,7 +350,9 @@ export default function OrderConfirmation() {
             <dt className="text-gray-500">Payment</dt>
             <dd>
               {order.payment_method === 'on_delivery'
-                ? 'Pay on delivery'
+                ? order.payment_status === 'paid'
+                  ? 'Paid by bank transfer'
+                  : 'Pay on delivery'
                 : order.payment_status === 'paid'
                   ? 'Paid online'
                   : order.payment_status === 'refund_pending'
