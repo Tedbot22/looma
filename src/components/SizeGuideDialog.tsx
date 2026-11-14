@@ -22,7 +22,7 @@ const head = `${cell} bg-gray-50 text-xs font-semibold uppercase tracking-wide t
 
 // The "Size guide" sheet: a bottom sheet on phones, a centred card on larger screens.
 // Mounted only while open. The Back button closes it (same idea as the review photo viewer).
-export default function SizeGuideDialog({ kind, productName, onClose }: Props) {
+export default function SizeGuideDialog({ kind, onClose }: Props) {
   const [unit, setUnit] = useState<Unit>('cm')
   const [tab, setTab] = useState<'tops' | 'bottoms'>('tops')
 
