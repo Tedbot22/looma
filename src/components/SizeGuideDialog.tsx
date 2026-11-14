@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
-import { whatsappLink } from '../lib/whatsapp'
 import {
   BOTTOMS_ROWS,
   CLOTHING_ROWS,
