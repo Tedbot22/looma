@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Heart, MessageCircle, Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
-import { discountPercent } from '../lib/format'
+import { discountPercent, formatNaira } from '../lib/format'
 import { whatsappLink } from '../lib/whatsapp'
 import { absoluteUrl, pageTitle, tidy, useSeo } from '../lib/seo'
 import { STORE_NAME } from '../config'
@@ -13,6 +13,7 @@ import { useCart } from '../context/CartContext'
 import { useWishlist } from '../context/WishlistContext'
 import PriceTag from '../components/PriceTag'
 import ImageCarousel from '../components/ImageCarousel'
+import ShareButton from '../components/ShareButton'
 import VariantPicker from '../components/VariantPicker'
 import ProductDetails from '../components/ProductDetails'
 import YouMayAlsoLike from '../components/YouMayAlsoLike'
@@ -200,13 +201,20 @@ export default function ProductPage() {
         <div className="space-y-4 sm:space-y-5">
           <div className="flex items-start justify-between gap-3">
             <h1 className="text-xl font-bold sm:text-2xl">{product.name}</h1>
-            <button
-              onClick={handleWishlist}
-              aria-label={saved ? 'Remove from wishlist' : 'Save to wishlist'}
-              className="shrink-0 rounded-full border border-gray-200 p-2 hover:border-brand"
-            >
-              <Heart size={20} className={saved ? 'fill-sale text-sale' : 'text-gray-500'} />
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <ShareButton
+                title={product.name}
+                text={`${product.name} - ${formatNaira(product.price)} on ${STORE_NAME}`}
+                url={absoluteUrl(`/product/${product.id}`)}
+              />
+              <button
+                onClick={handleWishlist}
+                aria-label={saved ? 'Remove from wishlist' : 'Save to wishlist'}
+                className="rounded-full border border-gray-200 p-2 hover:border-brand"
+              >
+                <Heart size={20} className={saved ? 'fill-sale text-sale' : 'text-gray-500'} />
+              </button>
+            </div>
           </div>
           <PriceTag price={product.price} compareAt={product.compare_at_price} size="lg" />
 

@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { NavLink, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatNaira } from '../lib/format'
 import { searchProducts } from '../lib/search'
+import { shuffleBySeed } from '../lib/shuffle'
 import { pageTitle, useSeo } from '../lib/seo'
 import { STORE_NAME } from '../config'
 import ProductCard from '../components/ProductCard'
@@ -50,6 +51,9 @@ export default function Shop() {
   const minNum = toNumber(minParam)
   const maxNum = toNumber(maxParam)
   const hasPrice = minNum !== null || maxNum !== null
+
+  // A new random number every time the shop page opens. It drives the shuffle below.
+  const [shuffleSeed] = useState(() => Math.random())
 
   const [panelOpen, setPanelOpen] = useState(false)
   const [minInput, setMinInput] = useState(minParam)
@@ -128,8 +132,12 @@ export default function Shop() {
     },
   })
 
-  // With a search, show only the matches, best match first. Without one, show everything newest first.
-  const products = term && allProducts ? searchProducts(allProducts, term).map((h) => h.item) : allProducts
+  // With a search, show only the matches, best match first. Without one, show everything in a fresh random
+  // order each time the shop opens (the same order is kept while you stay, so items don't jump around).
+  const products = useMemo(
+    () => (term && allProducts ? searchProducts(allProducts, term).map((h) => h.item) : allProducts && shuffleBySeed(allProducts, shuffleSeed)),
+    [term, allProducts, shuffleSeed]
+  )
 
   const filtering = term !== '' || hasPrice
 
