@@ -148,7 +148,7 @@ export default function Shop() {
     category
       ? {
           title: pageTitle(`${category.name} | Thrift Clothing`),
-          description: `Shop thrift ${category.name.toLowerCase()} at ${STORE_NAME}. Affordable, pre-loved pieces delivered in Nigeria.`,
+          description: `Shop thrift ${category.name.toLowerCase()} at ${STORE_NAME}. Affordable proces delivered in Nigeria.`,
           path: `/shop/${category.id}`,
           noindex: filtering,
         }
