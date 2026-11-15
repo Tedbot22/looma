@@ -37,7 +37,7 @@ export default function Invite() {
   if (!profile) return <p className="py-20 text-center text-gray-400">Loading…</p>
 
   const link = `${window.location.origin}/?ref=${profile.referral_code}`
-  const shareText = `I shop thrift finds at student prices on ${STORE_NAME}. Sign up with my link:`
+  const shareText = `Discover amazing thrift finds at student-friendly prices on ${STORE_NAME}! Sign up using my link and start shopping for great deals:`
 
   // Vouchers earned from invites so far. Each one used up a block of friends.
   const earned = coupons.filter((c) => c.source === 'referral')
