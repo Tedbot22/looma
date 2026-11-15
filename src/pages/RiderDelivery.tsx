@@ -318,8 +318,8 @@ export default function RiderDeliveryPage() {
         <Banner
           tone="amber"
           icon={<Banknote size={22} />}
-          title={`Collect ${formatNaira(o.amount_to_collect)} in cash`}
-          text="This is a pay-on-delivery order. Or let the customer pay by transfer below."
+          title={`Customer must pay ${formatNaira(o.amount_to_collect)} by transfer`}
+          text="Do NOT accept cash. Create the transfer account below; you can confirm delivery once payment shows as paid."
         />
       )}
 
@@ -468,7 +468,11 @@ export default function RiderDeliveryPage() {
 
         {verified && (
           <>
-            <button disabled={busy} onClick={confirm} className={`${primaryBtn} bg-green-600 hover:bg-green-700`}>
+            <button
+              disabled={busy || (o.amount_to_collect > 0 && !paidByTransfer)}
+              onClick={confirm}
+              className={`${primaryBtn} bg-green-600 hover:bg-green-700`}
+            >
               <CheckCircle2 size={18} /> {busy ? 'Confirming…' : 'Confirm delivery'}
             </button>
             <button disabled={busy} onClick={() => (setProblem(null), setScanning(true))} className={secondaryBtn}>

@@ -352,7 +352,7 @@ export default function OrderConfirmation() {
               {order.payment_method === 'on_delivery'
                 ? order.payment_status === 'paid'
                   ? 'Paid by bank transfer'
-                  : 'Pay on delivery'
+                  : 'Pay by transfer on delivery'
                 : order.payment_status === 'paid'
                   ? 'Paid online'
                   : order.payment_status === 'refund_pending'

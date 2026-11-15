@@ -3,8 +3,8 @@ import { CheckCircle2, Copy, Landmark } from 'lucide-react'
 import { formatNaira } from '../lib/format'
 import { createTransferAccount, getTransferState, type TransferAccount } from '../lib/rider'
 
-// Lets the rider generate a temporary bank account for this delivery so the customer can pay by transfer
-// instead of handing over cash. The server (not this page) confirms the money arrived with Paystack.
+// Pay-on-delivery customers pay ONLY by transfer: the rider generates a temporary bank account for this
+// delivery. No cash is accepted. The server (not this page) confirms the money arrived with Paystack.
 // Renders nothing for orders that are not pay-on-delivery.
 
 interface Props {
@@ -74,7 +74,7 @@ export default function RiderTransferPay({ token, riderStatus, onPaidChange }: P
             ? reply.message
             : reply.code === 'NETWORK'
               ? 'No connection. Nothing was changed. Try again.'
-              : 'Could not create the account. Collect cash or contact LOOMA.'
+              : 'Could not create the account. Try again, or contact LOOMA.'
         )
       }
     } finally {
@@ -113,7 +113,7 @@ export default function RiderTransferPay({ token, riderStatus, onPaidChange }: P
   return (
     <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 text-sm">
       <p className="flex items-center gap-2 font-semibold">
-        <Landmark size={16} /> Customer prefers to pay by transfer?
+        <Landmark size={16} /> Payment by bank transfer
       </p>
 
       {error && (
@@ -125,8 +125,8 @@ export default function RiderTransferPay({ token, riderStatus, onPaidChange }: P
       {!account || expired ? (
         <>
           <p className="text-gray-600">
-            Create a one-time bank account for this order. The customer sends the exact amount to it, and you'll see
-            "Paid" here once it arrives. The money goes to the store, not to you.
+            The customer pays by transfer, not cash. Create a one-time bank account for this order; they send the exact
+            amount to it and you'll see "Paid" here once it arrives. The money goes to the store, not to you.
           </p>
           {['out_for_delivery', 'qr_verified'].includes(riderStatus) ? (
             <button

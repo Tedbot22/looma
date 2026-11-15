@@ -194,6 +194,10 @@ export const MESSAGES: Record<string, { title: string; text: string }> = {
     title: 'Choose a reason',
     text: 'Pick one of the reasons in the list.',
   },
+  PAYMENT_REQUIRED: {
+    title: 'Payment not received yet',
+    text: 'The customer must pay by transfer first. Create the transfer account, let them pay, then confirm delivery. Do not accept cash.',
+  },
   ERROR: {
     title: 'Something went wrong',
     text: 'Please try again. If it keeps happening, contact LOOMA.',

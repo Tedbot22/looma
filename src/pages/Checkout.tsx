@@ -475,7 +475,7 @@ export default function Checkout() {
             />
             <span>
               <span className="block font-medium">Pay on delivery</span>
-              <span className="text-sm text-gray-500">Pay when your order arrives.</span>
+              <span className="text-sm text-gray-500">When your order arrives, the rider gives you a one-time bank account. Pay the exact amount by transfer (no cash).</span>
             </span>
           </label>
 
