@@ -143,7 +143,7 @@ async function categorySeo(_origin: string, id: string): Promise<SeoData | null>
   if (!c) return null
   return {
     title: `${c.name} | Thrift Clothing | ${STORE_NAME}`,
-    description: `Shop thrift ${c.name.toLowerCase()} at ${STORE_NAME}. Affordable, pre-loved pieces delivered in Nigeria.`,
+    description: `Shop thrift ${c.name.toLowerCase()} at ${STORE_NAME}. Affordable prices delivered in Nigeria.`,
     path: `/shop/${c.id}`,
     image: SHARE_IMAGE,
     ogType: 'website',
