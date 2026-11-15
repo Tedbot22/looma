@@ -10,13 +10,18 @@ import { createTransferAccount, getTransferState, type TransferAccount } from '.
 interface Props {
   token: string
   riderStatus: string
-  onPaidChange: (paid: boolean) => void
+  // True when the delivery data says there is money to collect: we then show this card even if the
+  // payment service can't be reached, so the rider sees a problem instead of a missing button.
+  expected: boolean
+  onState: (state: { applicable: boolean; paid: boolean }) => void
 }
 
 const POLL_MS = 6000
 
-export default function RiderTransferPay({ token, riderStatus, onPaidChange }: Props) {
+export default function RiderTransferPay({ token, riderStatus, expected, onState }: Props) {
   const [applicable, setApplicable] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [paid, setPaid] = useState(false)
   const [account, setAccount] = useState<TransferAccount | null>(null)
   const [busy, setBusy] = useState(false)
@@ -28,19 +33,23 @@ export default function RiderTransferPay({ token, riderStatus, onPaidChange }: P
   const apply = useCallback(
     (reply: Awaited<ReturnType<typeof getTransferState>>) => {
       if (!reply.ok) return false
-      setApplicable(reply.applicable === true)
+      setLoadFailed(false)
+      const isApplicable = reply.applicable === true
+      setApplicable(isApplicable)
       const isPaid = reply.paid === true
       setPaid(isPaid)
-      onPaidChange(isPaid)
+      onState({ applicable: isApplicable, paid: isPaid })
       setAccount(isPaid ? null : ((reply.account as TransferAccount | null) ?? null))
       return true
     },
-    [onPaidChange]
+    [onState]
   )
 
   // First look, and again when the rider returns to this page.
   const refresh = useCallback(async () => {
-    apply(await getTransferState(token))
+    const ok = apply(await getTransferState(token))
+    if (!ok) setLoadFailed(true)
+    setLoaded(true)
   }, [apply, token])
 
   useEffect(() => {
@@ -93,7 +102,31 @@ export default function RiderTransferPay({ token, riderStatus, onPaidChange }: P
     }
   }
 
-  if (!applicable) return null
+  if (!applicable) {
+    if (!expected) return null
+    // Money is due but we have no answer from the payment service yet (or it failed).
+    return (
+      <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 text-sm">
+        <p className="flex items-center gap-2 font-semibold">
+          <Landmark size={16} /> Payment by bank transfer
+        </p>
+        {!loaded ? (
+          <p className="text-gray-500">Loading payment options…</p>
+        ) : (
+          <>
+            <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-900">
+              {loadFailed
+                ? "Couldn't load the payment option. Check your connection and try again. If it keeps failing, contact LOOMA."
+                : 'Transfer payment is not available for this order. Contact LOOMA.'}
+            </p>
+            <button onClick={refresh} className="w-full rounded-lg border border-gray-300 px-4 py-2.5 font-medium">
+              Try again
+            </button>
+          </>
+        )}
+      </section>
+    )
+  }
 
   if (paid) {
     return (
@@ -128,16 +161,15 @@ export default function RiderTransferPay({ token, riderStatus, onPaidChange }: P
             The customer pays by transfer, not cash. Create a one-time bank account for this order; they send the exact
             amount to it and you'll see "Paid" here once it arrives. The money goes to the store, not to you.
           </p>
-          {['out_for_delivery', 'qr_verified'].includes(riderStatus) ? (
-            <button
-              disabled={busy}
-              onClick={generate}
-              className="w-full rounded-lg bg-brand px-4 py-3 font-semibold text-white disabled:opacity-60"
-            >
-              {busy ? 'Creating account…' : expired ? 'Create a new account' : 'Create transfer account'}
-            </button>
-          ) : (
-            <p className="text-xs text-gray-500">Tap "I've picked up the package" first, then you can create the account.</p>
+          <button
+            disabled={busy || !['out_for_delivery', 'qr_verified'].includes(riderStatus)}
+            onClick={generate}
+            className="w-full rounded-lg bg-brand px-4 py-3 font-semibold text-white disabled:opacity-50"
+          >
+            {busy ? 'Creating account…' : expired ? 'Create a new account' : 'Create transfer account'}
+          </button>
+          {!['out_for_delivery', 'qr_verified'].includes(riderStatus) && (
+            <p className="text-xs text-gray-500">Tap "I've picked up the package" first, then this button unlocks.</p>
           )}
         </>
       ) : (

@@ -24,6 +24,15 @@ type View =
   | { kind: 'delivered'; already: boolean }
   | { kind: 'offline' } // first load failed: nothing is known yet
 
+// Pay-on-delivery orders have an extra "Paid" step before the QR check.
+const POD_STEPS = [
+  { key: 'assigned', label: 'Assigned' },
+  { key: 'out_for_delivery', label: 'On the way' },
+  { key: 'paid', label: 'Paid' },
+  { key: 'qr_verified', label: 'QR verified' },
+  { key: 'delivered', label: 'Delivered' },
+] as const
+
 const STEPS = [
   { key: 'assigned', label: 'Assigned' },
   { key: 'out_for_delivery', label: 'On the way' },
@@ -66,7 +75,8 @@ export default function RiderDeliveryPage() {
   const [otpOpen, setOtpOpen] = useState(false)
   const [otpSent, setOtpSent] = useState<{ hint: string | null; resendAtMs: number } | null>(null)
   const [now, setNow] = useState(Date.now())
-  const [paidByTransfer, setPaidByTransfer] = useState(false) // set by RiderTransferPay once the server confirms
+  // Reported by RiderTransferPay from what the server says: is this a pay-on-delivery order, and is it paid?
+  const [pay, setPay] = useState({ applicable: false, paid: false })
   const [otp, setOtp] = useState('')
   const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null)
   const busyRef = useRef(false) // blocks double taps before React re-renders
@@ -257,7 +267,14 @@ export default function RiderDeliveryPage() {
 
   // ---------- Main screen ----------
   const { assignment: a, order: o, items } = view.data
-  const stepIndex = STEPS.findIndex((s) => s.key === a.status)
+  const payOnDelivery = o.amount_to_collect > 0 || pay.applicable
+  const steps = payOnDelivery ? POD_STEPS : STEPS
+  const awaitingPayment = payOnDelivery && !pay.paid
+  // Paid sits between "On the way" and "QR verified".
+  const stepIndex =
+    payOnDelivery && a.status === 'out_for_delivery' && pay.paid
+      ? 2
+      : steps.findIndex((s) => s.key === a.status)
   const mapsUrl =
     o.delivery_lat != null && o.delivery_lon != null
       ? `https://www.google.com/maps/dir/?api=1&destination=${o.delivery_lat},${o.delivery_lon}&travelmode=driving`
@@ -276,7 +293,7 @@ export default function RiderDeliveryPage() {
 
       {/* Progress */}
       <ol className="flex items-center" aria-label="Delivery progress">
-        {STEPS.map((s, i) => (
+        {steps.map((s, i) => (
           <li key={s.key} className="flex flex-1 flex-col items-center gap-1 text-center">
             <span
               className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
@@ -314,7 +331,7 @@ export default function RiderDeliveryPage() {
         </p>
       </section>
 
-      {o.amount_to_collect > 0 && !paidByTransfer && (
+      {awaitingPayment && o.amount_to_collect > 0 && (
         <Banner
           tone="amber"
           icon={<Banknote size={22} />}
@@ -323,7 +340,7 @@ export default function RiderDeliveryPage() {
         />
       )}
 
-      <RiderTransferPay token={token} riderStatus={a.status} onPaidChange={setPaidByTransfer} />
+      <RiderTransferPay token={token} riderStatus={a.status} expected={o.amount_to_collect > 0} onState={setPay} />
 
       {/* Where to */}
       <section className="space-y-2 rounded-xl border border-gray-200 bg-white p-4 text-sm">
@@ -387,6 +404,14 @@ export default function RiderDeliveryPage() {
                 <Package size={18} /> I've picked up the package
               </button>
             )}
+            {awaitingPayment ? (
+              <p className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                <Clock size={16} className="mt-0.5 shrink-0" />
+                Scanning unlocks once the customer's transfer is confirmed. Create the transfer account above and wait for
+                "Paid".
+              </p>
+            ) : (
+              <>
             <button disabled={busy} onClick={() => (setProblem(null), setScanning(true))} className={primaryBtn}>
               <QrCode size={18} /> Scan customer's QR code
             </button>
@@ -463,13 +488,15 @@ export default function RiderDeliveryPage() {
                 </button>
               </section>
             )}
+              </>
+            )}
           </>
         )}
 
         {verified && (
           <>
             <button
-              disabled={busy || (o.amount_to_collect > 0 && !paidByTransfer)}
+              disabled={busy || awaitingPayment}
               onClick={confirm}
               className={`${primaryBtn} bg-green-600 hover:bg-green-700`}
             >
