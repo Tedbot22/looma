@@ -2,14 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 
-export interface Banner {
-  id: string
-  image_url: string
-  title: string | null
-  subtitle: string | null
-  button_label: string | null
-  link_url: string | null
-}
+import type { Banner } from '../lib/types'
+export type { Banner }
 
 const SLIDE_MS = 5500 // keep in step with .hero-progress in index.css
 

@@ -2,16 +2,17 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
-import { supabase } from '../lib/supabase'
 import { useRecentlyViewedProducts } from '../hooks/useRecentlyViewedProducts'
 import { useProductPool, useRecommendations } from '../hooks/useRecommendations'
-import HeroCarousel, { type Banner } from '../components/HeroCarousel'
+import HeroCarousel from '../components/HeroCarousel'
 import ProductCard from '../components/ProductCard'
 import { CategoryRowSkeleton, HeroSkeleton, ProductCardSkeleton } from '../components/Skeleton'
-import type { Category, ProductWithVariants } from '../lib/types'
+import type { ProductWithVariants } from '../lib/types'
 import { randomSeed, todaysDealsList } from '../lib/todaysDeals'
 import { STORE_NAME } from '../config'
 import { FULL_BLEED } from '../lib/layout'
+import { fetchActiveBanners, fetchCategories } from '../api/catalog'
+import { queryKeys } from '../api/queryKeys'
 
 // A titled row of products, with an optional button to see the full list.
 function Section({ title, subtitle, to, children }: { title: string; subtitle?: string; to?: string; children: ReactNode }) {
@@ -75,27 +76,12 @@ function Products({ items }: { items: ProductWithVariants[] }) {
 }
 
 export default function Home() {
-  const { data: categories, isLoading: categoriesLoading } = useQuery({
-    queryKey: ['categories'],
-    queryFn: async (): Promise<Category[]> => {
-      const { data, error } = await supabase.from('categories').select('*').order('sort_order')
-      if (error) throw error
-      return data
-    },
-  })
+  const { data: categories, isLoading: categoriesLoading } = useQuery({ queryKey: queryKeys.categories(), queryFn: fetchCategories })
 
   // The banner images the owner uploaded (Admin, then Banners), in the order they chose.
   const { data: banners, isLoading: bannersLoading } = useQuery({
-    queryKey: ['banners'],
-    queryFn: async (): Promise<Banner[]> => {
-      const { data, error } = await supabase
-        .from('hero_banners')
-        .select('id, image_url, title, subtitle, button_label, link_url')
-        .eq('is_active', true)
-        .order('sort_order')
-      if (error) throw error
-      return data as Banner[]
-    },
+    queryKey: queryKeys.banners(),
+    queryFn: fetchActiveBanners,
     staleTime: 5 * 60_000,
   })
 

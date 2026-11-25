@@ -4,10 +4,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Home } from 'lucide-react'
 import { toast } from 'sonner'
-import { supabase } from '../lib/supabase'
 import { formatNaira } from '../lib/format'
-import { startPayment } from '../lib/payments'
-import { formatKm, requestQuote, type Quote } from '../lib/delivery'
+import { requestQuote } from '../api/delivery'
+import { classifyPlaceOrderError, placeOrder } from '../api/orders'
+import { startPayment } from '../api/payments'
+import { queryKeys } from '../api/queryKeys'
+import { formatKm, type Quote } from '../lib/delivery'
 import { couponDiscount, couponStatus, describeCoupon } from '../lib/coupons'
 import { useCart } from '../context/CartContext'
 import { useCartLines } from '../hooks/useCartLines'
@@ -67,7 +69,7 @@ export default function Checkout() {
 
   // A home address is priced by distance. The SERVER measures the route and works out the fee,
   // and saves it as a "quote". We ask for one whenever a saved address is selected.
-  const quoteKey = ['delivery-quote', savedAddress?.id, savedAddress?.latitude, savedAddress?.longitude, savedAddress?.note]
+  const quoteKey = queryKeys.delivery.quote(savedAddress?.id, savedAddress?.latitude, savedAddress?.longitude, savedAddress?.note)
   const quoteQuery = useQuery({
     queryKey: quoteKey,
     enabled: !!savedAddress,
@@ -169,7 +171,7 @@ export default function Checkout() {
   async function saveHomeAddress(values: AddressValues, previewQuote: Quote) {
     const id = await addressActions.add(values)
     // The dialog already priced this address, so reuse that quote instead of paying for another.
-    queryClient.setQueryData(['delivery-quote', id, values.latitude, values.longitude, values.note?.trim() || null], previewQuote)
+    queryClient.setQueryData(queryKeys.delivery.quote(id, values.latitude, values.longitude, values.note?.trim() || null), previewQuote)
     setSelectedKey(`address:${id}`)
     setDialogOpen(false)
     toast.success('Address saved to your profile')
@@ -215,36 +217,42 @@ export default function Checkout() {
     // Only available items are sent, at the quantity we can actually fulfil.
     // We send the delivery option and, for home delivery, the id of the server's price quote.
     // The fee itself and the address come from that saved quote, never from the browser.
-    const { data: orderId, error } = await supabase.rpc('place_order', {
-      p_items: orderable.map((l) => ({ variant_id: l.variantId, quantity: l.effectiveQty })),
-      p_payment_method: method,
-      p_zone_id: zone.id,
-      p_phone: phone.trim(),
-      p_coupon_id: chosenVoucher?.coupon.id ?? null,
-      p_quote_id: quoteId,
-    })
-
-    if (error) {
+    let orderId: string
+    try {
+      orderId = await placeOrder({
+        items: orderable.map((l) => ({ variantId: l.variantId, quantity: l.effectiveQty })),
+        paymentMethod: method,
+        zoneId: zone.id,
+        phone: phone.trim(),
+        couponId: chosenVoucher?.coupon.id ?? null,
+        quoteId,
+      })
+    } catch (err) {
       // The database rolled the WHOLE order back, so nothing was charged.
-      if (error.message.includes('OUT_OF_STOCK') || error.message.includes('UNAVAILABLE')) {
-        await refetch() // the sold-out item greys out in the summary
-        toast.error(
-          'An item just sold out. We updated your order summary: please review it and place your order again.'
-        )
-      } else if (error.message.includes('COUPON_')) {
-        // Used elsewhere, expired while they were deciding, or the order no longer meets the minimum.
-        await queryClient.invalidateQueries({ queryKey: ['coupons'] })
-        setCouponChoice('none')
-        toast.error("That voucher can't be used on this order any more. Check your vouchers and try again.")
-      } else if (error.message.includes('QUOTE_')) {
-        await queryClient.invalidateQueries({ queryKey: ['delivery-quote'] })
-        toast.error('The delivery price expired. Please check the total and place your order again.')
-      } else if (error.message.includes('INVALID_ZONE')) {
-        await queryClient.invalidateQueries({ queryKey: ['delivery-zones'] })
-        await queryClient.invalidateQueries({ queryKey: ['addresses'] })
-        toast.error("That delivery option isn't available right now. Please choose another.")
-      } else {
-        toast.error('Something went wrong placing your order. Please try again.')
+      switch (classifyPlaceOrderError(err)) {
+        case 'out_of_stock':
+          await refetch() // the sold-out item greys out in the summary
+          toast.error(
+            'An item just sold out. We updated your order summary: please review it and place your order again.'
+          )
+          break
+        case 'coupon':
+          // Used elsewhere, expired while they were deciding, or the order no longer meets the minimum.
+          await queryClient.invalidateQueries({ queryKey: queryKeys.account.couponsRoot() })
+          setCouponChoice('none')
+          toast.error("That voucher can't be used on this order any more. Check your vouchers and try again.")
+          break
+        case 'quote':
+          await queryClient.invalidateQueries({ queryKey: queryKeys.delivery.quoteRoot() })
+          toast.error('The delivery price expired. Please check the total and place your order again.')
+          break
+        case 'zone':
+          await queryClient.invalidateQueries({ queryKey: queryKeys.deliveryZones() })
+          await queryClient.invalidateQueries({ queryKey: queryKeys.account.addressesRoot() })
+          toast.error("That delivery option isn't available right now. Please choose another.")
+          break
+        default:
+          toast.error('Something went wrong placing your order. Please try again.')
       }
       setSubmitting(false)
       return
@@ -256,7 +264,7 @@ export default function Checkout() {
     if (method === 'online') {
       setRedirecting(true)
       try {
-        paymentUrl = await startPayment(orderId as string)
+        paymentUrl = await startPayment(orderId)
       } catch (err) {
         toast.error(`${(err as Error).message} You can try again from your order page.`)
       }

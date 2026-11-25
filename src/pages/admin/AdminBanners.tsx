@@ -3,21 +3,20 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, Eye, EyeOff, ImagePlus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useDialog } from '../../context/DialogContext'
-import { supabase } from '../../lib/supabase'
+import {
+  addBanner,
+  deleteBanner,
+  fetchAdminBanners,
+  reorderBanners,
+  setBannerActive,
+  updateBanner,
+} from '../../api/adminCatalog'
+import { errorMessage } from '../../api/db'
+import { invalidateAll, queryKeys } from '../../api/queryKeys'
+import type { BannerRow } from '../../lib/types'
 import { uploadProductImage } from '../../lib/images'
 import { BANNER_SIZE_HINT } from '../../lib/layout'
 import { ListSkeleton } from '../../components/Skeleton'
-
-interface BannerRow {
-  id: string
-  image_url: string
-  title: string | null
-  subtitle: string | null
-  button_label: string | null
-  link_url: string | null
-  sort_order: number
-  is_active: boolean
-}
 
 const inputClass =
   'w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand'
@@ -59,26 +58,31 @@ function BannerCard({
     }
 
     setBusy(true)
-    const { error } = await supabase
-      .from('hero_banners')
-      .update({
+    try {
+      await updateBanner(banner.id, {
         title: title.trim() || null,
         subtitle: subtitle.trim() || null,
         button_label: buttonLabel.trim() || null,
         link_url: linkUrl.trim() || null,
       })
-      .eq('id', banner.id)
-    setBusy(false)
-    if (error) return toast.error(error.message)
+    } catch (err) {
+      return toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
     toast.success('Banner saved')
     onChanged()
   }
 
   async function toggleActive() {
     setBusy(true)
-    const { error } = await supabase.from('hero_banners').update({ is_active: !banner.is_active }).eq('id', banner.id)
-    setBusy(false)
-    if (error) return toast.error(error.message)
+    try {
+      await setBannerActive(banner.id, !banner.is_active)
+    } catch (err) {
+      return toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
     toast.success(banner.is_active ? 'Banner hidden from the home page' : 'Banner is now showing')
     onChanged()
   }
@@ -92,9 +96,13 @@ function BannerCard({
     })
     if (!ok) return
     setBusy(true)
-    const { error } = await supabase.from('hero_banners').delete().eq('id', banner.id)
-    setBusy(false)
-    if (error) return toast.error(error.message)
+    try {
+      await deleteBanner(banner.id)
+    } catch (err) {
+      return toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
     toast.success('Banner deleted')
     onChanged()
   }
@@ -162,18 +170,12 @@ export default function AdminBanners() {
   const [uploading, setUploading] = useState(false)
 
   const { data: banners, isLoading, error } = useQuery({
-    queryKey: ['admin-banners'],
-    queryFn: async (): Promise<BannerRow[]> => {
-      // The admin's access rules let the owner see hidden banners too.
-      const { data, error } = await supabase.from('hero_banners').select('*').order('sort_order')
-      if (error) throw error
-      return data as BannerRow[]
-    },
+    queryKey: queryKeys.admin.banners(),
+    queryFn: fetchAdminBanners, // the owner's access rules include hidden banners
   })
 
   // The home page caches its banners, so refresh them after any change.
-  const refresh = () =>
-    Promise.all(['admin-banners', 'banners'].map((k) => queryClient.invalidateQueries({ queryKey: [k] })))
+  const refresh = () => invalidateAll(queryClient, [queryKeys.admin.banners(), queryKeys.banners()])
 
   async function handleFiles(files: FileList | null) {
     const images = Array.from(files ?? []).filter((f) => f.type.startsWith('image/'))
@@ -184,8 +186,7 @@ export default function AdminBanners() {
       let order = Math.max(-1, ...(banners ?? []).map((b) => b.sort_order))
       for (const file of images) {
         const url = await uploadProductImage(file, 2400) // wide banners keep more detail than product photos
-        const { error } = await supabase.from('hero_banners').insert({ image_url: url, sort_order: ++order })
-        if (error) throw error
+        await addBanner(url, ++order)
       }
       toast.success(images.length === 1 ? 'Banner added' : `${images.length} banners added`)
       await refresh()
@@ -206,10 +207,11 @@ export default function AdminBanners() {
     const reordered = [...banners]
     ;[reordered[index], reordered[target]] = [reordered[target], reordered[index]]
 
-    const { error } = await supabase
-      .from('hero_banners')
-      .upsert(reordered.map((b, i) => ({ id: b.id, image_url: b.image_url, sort_order: i })), { onConflict: 'id' })
-    if (error) return toast.error(error.message)
+    try {
+      await reorderBanners(reordered)
+    } catch (err) {
+      return toast.error(errorMessage(err))
+    }
     refresh()
   }
 

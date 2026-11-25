@@ -3,33 +3,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useDialog } from '../../context/DialogContext'
-import { supabase } from '../../lib/supabase'
+import {
+  deleteTemplate,
+  fetchCouponStats,
+  fetchIssuedCoupons,
+  fetchReferredPeople,
+  fetchTemplates,
+  saveTemplate,
+  setTemplateActive,
+  type Template,
+} from '../../api/adminCoupons'
+import { errorMessage } from '../../api/db'
+import { queryKeys } from '../../api/queryKeys'
+import { updateAppSettings } from '../../api/settings'
 import { formatNaira } from '../../lib/format'
 import { useAppSettings } from '../../hooks/useAppSettings'
-import { couponStatus, describeCoupon, type Coupon, type CouponKind } from '../../lib/coupons'
-
-interface Template {
-  id: string
-  name: string
-  kind: CouponKind
-  value: number
-  max_discount: number
-  min_order: number
-  weight: number
-  is_active: boolean
-}
-
-type IssuedCoupon = Coupon & {
-  user_id: string
-  profiles: { full_name: string | null; phone: string | null } | null
-}
-
-interface ReferredPerson {
-  id: string
-  full_name: string | null
-  phone: string | null
-  orders: { order_number: number; subtotal: number; status: string; delivery_address: string }[]
-}
+import { couponStatus, describeCoupon, type CouponKind } from '../../lib/coupons'
 
 const KIND_LABEL: Record<CouponKind, string> = {
   free_delivery: 'Free delivery',
@@ -63,19 +52,18 @@ function SettingsPanel() {
     if (!days || !Number.isInteger(d) || d < 1) return toast.error('Enter a whole number of days (1 or more).')
 
     setSaving(true)
-    const results = await Promise.all([
-      supabase.from('app_settings').update({ value: String(b) }).eq('key', 'coupon_max_cost'),
-      supabase.from('app_settings').update({ value: String(d) }).eq('key', 'coupon_valid_days'),
-    ])
+    try {
+      await updateAppSettings({ coupon_max_cost: String(b), coupon_valid_days: String(d) })
+    } catch (err) {
+      setSaving(false)
+      return toast.error(errorMessage(err))
+    }
     setSaving(false)
-
-    const failed = results.find((r) => r.error)
-    if (failed?.error) return toast.error(failed.error.message)
 
     toast.success('Settings saved')
     setBudgetInput(null)
     setDaysInput(null)
-    queryClient.invalidateQueries({ queryKey: ['app-settings'] })
+    queryClient.invalidateQueries({ queryKey: queryKeys.appSettings() })
   }
 
   return (
@@ -135,14 +123,15 @@ function TemplateForm({ initial, onDone }: { initial?: Template; onDone: () => v
 
     setSaving(true)
     const row = { name: name.trim(), kind, value: v, max_discount: max, min_order: min, weight: w }
-    const { error } = initial
-      ? await supabase.from('coupon_templates').update(row).eq('id', initial.id)
-      : await supabase.from('coupon_templates').insert(row)
+    try {
+      await saveTemplate(row, initial?.id)
+    } catch (err) {
+      setSaving(false)
+      return toast.error(errorMessage(err))
+    }
     setSaving(false)
-
-    if (error) return toast.error(error.message)
     toast.success(initial ? 'Reward updated' : 'Reward added')
-    queryClient.invalidateQueries({ queryKey: ['admin-templates'] })
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.templates() })
     onDone()
   }
 
@@ -220,12 +209,8 @@ function PoolTab() {
   const budget = Number(settings?.coupon_max_cost ?? 0)
 
   const { data: templates, isLoading, error } = useQuery({
-    queryKey: ['admin-templates'],
-    queryFn: async (): Promise<Template[]> => {
-      const { data, error } = await supabase.from('coupon_templates').select('*').order('created_at')
-      if (error) throw error
-      return data as Template[]
-    },
+    queryKey: queryKeys.admin.templates(),
+    queryFn: fetchTemplates,
   })
 
   // A reward can only be drawn if it is switched on, has weight, and fits the budget.
@@ -233,11 +218,8 @@ function PoolTab() {
   const totalWeight = (templates ?? []).filter(drawable).reduce((sum, t) => sum + t.weight, 0)
 
   const toggle = useMutation({
-    mutationFn: async (t: Template) => {
-      const { error } = await supabase.from('coupon_templates').update({ is_active: !t.is_active }).eq('id', t.id)
-      if (error) throw error
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-templates'] }),
+    mutationFn: (t: Template) => setTemplateActive(t.id, !t.is_active),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.templates() }),
     onError: (err) => toast.error((err as Error).message),
   })
 
@@ -249,10 +231,13 @@ function PoolTab() {
       danger: true,
     })
     if (!ok) return
-    const { error } = await supabase.from('coupon_templates').delete().eq('id', t.id)
-    if (error) return toast.error(error.message)
+    try {
+      await deleteTemplate(t.id)
+    } catch (err) {
+      return toast.error(errorMessage(err))
+    }
     toast.success('Reward deleted')
-    queryClient.invalidateQueries({ queryKey: ['admin-templates'] })
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.templates() })
   }
 
   return (
@@ -347,15 +332,8 @@ function ReferralList({ userId }: { userId: string }) {
   const minOrder = Number(settings?.referral_min_order ?? 3000)
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['admin-referrals', userId],
-    queryFn: async (): Promise<ReferredPerson[]> => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, phone, orders(order_number, subtotal, status, delivery_address)')
-        .eq('referred_by', userId)
-      if (error) throw error
-      return data as unknown as ReferredPerson[]
-    },
+    queryKey: queryKeys.admin.referrals(userId),
+    queryFn: () => fetchReferredPeople(userId),
   })
 
   if (isLoading) return <p className="mt-3 text-sm text-gray-400">Loading referrals…</p>
@@ -397,31 +375,14 @@ function IssuedTab() {
   const [openId, setOpenId] = useState<string | null>(null)
 
   const { data: coupons, isLoading, error } = useQuery({
-    queryKey: ['admin-coupons'],
-    queryFn: async (): Promise<IssuedCoupon[]> => {
-      const { data, error } = await supabase
-        .from('coupons')
-        .select('*, profiles(full_name, phone)')
-        .order('issued_at', { ascending: false })
-        .limit(100)
-      if (error) throw error
-      return data as unknown as IssuedCoupon[]
-    },
+    queryKey: queryKeys.admin.coupons(),
+    queryFn: fetchIssuedCoupons,
   })
 
   // The real cost so far: what vouchers have actually taken off orders.
   const { data: stats } = useQuery({
-    queryKey: ['admin-coupon-stats'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('coupons').select('used_at, discount_applied').limit(5000)
-      if (error) throw error
-      const rows = data as { used_at: string | null; discount_applied: number | null }[]
-      return {
-        issued: rows.length,
-        used: rows.filter((r) => r.used_at).length,
-        cost: rows.reduce((sum, r) => sum + (r.used_at ? Number(r.discount_applied ?? 0) : 0), 0),
-      }
-    },
+    queryKey: queryKeys.admin.couponStats(),
+    queryFn: fetchCouponStats,
   })
 
   return (

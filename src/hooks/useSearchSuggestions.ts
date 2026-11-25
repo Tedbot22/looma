@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../lib/supabase'
-import { suggestQueries, type QuerySuggestion, type SearchableProduct } from '../lib/search'
+import { fetchSearchCandidates } from '../api/shop'
+import { suggestQueries, type QuerySuggestion } from '../lib/search'
+import { queryKeys } from '../api/queryKeys'
 
 export type Suggestion = QuerySuggestion
 
@@ -9,42 +10,34 @@ export type Suggestion = QuerySuggestion
 export const cleanSearchTerm = (raw: string) =>
   raw.replace(/[%_,()*"\\]/g, ' ').replace(/\s+/g, ' ').trim()
 
-// The searchable text of every active item, loaded once and kept for a few minutes. Suggestions are
-// then worked out on the device, so the list updates instantly as you type.
-function useSearchIndex(enabled: boolean) {
-  return useQuery({
-    queryKey: ['search-index'],
-    enabled,
-    staleTime: 5 * 60_000,
-    queryFn: async (): Promise<SearchableProduct[]> => {
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, name, category_id, details, description, categories(name), product_variants(color, size, is_active)')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-      if (error) throw error
-      return (data ?? []) as unknown as SearchableProduct[]
-    },
-  })
-}
+// How many matching items the suggestions are worked out from. A handful is plenty for a dropdown.
+const SUGGESTION_SAMPLE = 40
 
 // Suggested searches for the dropdown (like "black hoodie" or "black in Jackets"), best first.
+// The database finds the matching items; the wording of the suggestions is still worked out here.
 export function useSearchSuggestions(text: string, enabled: boolean) {
   const [debounced, setDebounced] = useState('')
 
-  // A very short pause, only to avoid redoing the work on every single keystroke.
+  // A short pause so a request isn't sent for every single keystroke.
   useEffect(() => {
-    const timer = setTimeout(() => setDebounced(cleanSearchTerm(text)), 120)
+    const timer = setTimeout(() => setDebounced(cleanSearchTerm(text)), 200)
     return () => clearTimeout(timer)
   }, [text])
 
   const term = debounced.length >= 2 ? debounced : ''
-  const index = useSearchIndex(enabled && term !== '')
+
+  const matches = useQuery({
+    queryKey: queryKeys.products.suggest(term),
+    enabled: enabled && term !== '',
+    staleTime: 60_000,
+    placeholderData: (previous) => previous, // keep the old list showing while the next one loads
+    queryFn: () => fetchSearchCandidates(term, {}, SUGGESTION_SAMPLE),
+  })
 
   const suggestions = useMemo<Suggestion[]>(
-    () => (term && index.data ? suggestQueries(index.data, term) : []),
-    [term, index.data]
+    () => (term && matches.data ? suggestQueries(matches.data, term) : []),
+    [term, matches.data]
   )
 
-  return { suggestions, loading: term !== '' && index.isLoading, term }
+  return { suggestions, loading: term !== '' && matches.isLoading, term }
 }

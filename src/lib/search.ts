@@ -81,6 +81,13 @@ for (const group of SYNONYM_GROUPS) {
   }
 }
 
+// What the database is asked to find. Each typed word comes with the words that may stand in for it
+// ("trousers" -> pants, slacks). The database returns every product that could match, and searchProducts()
+// below does the final ranking, so results and their order are the same as when everything was on the device.
+export function queryAlternatives(query: string): string[][] {
+  return tokenize(query).map((word) => [word, ...(SYNONYMS.get(word) ?? [])])
+}
+
 // ---------- typo tolerance ----------
 
 // True when the two words differ by at most one letter added, removed, changed or swapped.

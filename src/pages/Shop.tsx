@@ -1,17 +1,17 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { NavLink, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { SlidersHorizontal, X } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { fetchSearchCandidates, fetchShopPage, SEARCH_CANDIDATE_LIMIT, SHOP_PAGE_SIZE } from '../api/shop'
 import { formatNaira } from '../lib/format'
 import { searchProducts } from '../lib/search'
-import { shopOrder } from '../lib/productOrder'
 import { pageTitle, useSeo } from '../lib/seo'
 import { STORE_NAME } from '../config'
 import ProductCard from '../components/ProductCard'
 import { PRODUCT_GRID } from '../lib/layout'
 import { ChipsSkeleton, ProductGridSkeleton } from '../components/Skeleton'
-import type { Category, ProductWithVariants } from '../lib/types'
+import { fetchCategories } from '../api/catalog'
+import { queryKeys } from '../api/queryKeys'
 
 const chipClass = ({ isActive }: { isActive: boolean }) =>
   `whitespace-nowrap rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
@@ -52,8 +52,9 @@ export default function Shop() {
   const maxNum = toNumber(maxParam)
   const hasPrice = minNum !== null || maxNum !== null
 
-  // A new random number every time the shop page opens. It drives the shuffle below.
-  const [shuffleSeed] = useState(() => Math.random())
+  // A new random number every time the shop page opens. The database uses it for the shuffle, so the
+  // order stays the same from one page of results to the next.
+  const [shuffleSeed] = useState(() => Math.floor(Math.random() * 2_147_483_647))
 
   const [panelOpen, setPanelOpen] = useState(false)
   const [minInput, setMinInput] = useState(minParam)
@@ -94,51 +95,81 @@ export default function Shop() {
   }
 
   const { data: categories } = useQuery({
-    queryKey: ['categories'], // same key as Home and the footer, so it's cached and not refetched
-    queryFn: async (): Promise<Category[]> => {
-      const { data, error } = await supabase.from('categories').select('*').order('sort_order')
-      if (error) throw error
-      return data
-    },
+    queryKey: queryKeys.categories(), // same key as Home and the footer, so it's cached and not refetched
+    queryFn: fetchCategories,
   })
 
-  // The search words are matched on the device (see lib/search.ts), against the name, category, colour,
-  // size, details and description. So the database is only asked for the category and price range, and
-  // typing a new search re-ranks the results instantly without another request.
   const term = q.replace(/\s+/g, ' ').trim()
+  const searching = term !== ''
+  const filters = useMemo(() => ({ categoryId: categoryId ?? null, min: minNum, max: maxNum }), [categoryId, minNum, maxNum])
 
-  const {
-    data: allProducts,
-    isLoading,
-    isPlaceholderData,
-    error,
-  } = useQuery({
-    queryKey: ['products', categoryId ?? 'all', minNum, maxNum],
-    placeholderData: (previous) => previous, // keep showing the last results while new ones load
-    queryFn: async (): Promise<ProductWithVariants[]> => {
-      let query = supabase
-        .from('products')
-        .select('*, product_variants(*), categories(name)')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-
-      if (categoryId) query = query.eq('category_id', categoryId)
-      if (minNum !== null) query = query.gte('price', minNum)
-      if (maxNum !== null) query = query.lte('price', maxNum)
-
-      const { data, error } = await query
-      if (error) throw error
-      return data as ProductWithVariants[]
+  // BROWSING (no search words): the database sends one page at a time, in the shop's usual shuffled order
+  // (newer and discounted items nudged up). More pages load as you scroll.
+  const browse = useInfiniteQuery({
+    queryKey: queryKeys.products.shop(categoryId ?? null, minNum, maxNum, shuffleSeed),
+    enabled: !searching,
+    initialPageParam: 0,
+    placeholderData: keepPreviousData, // keep showing the last results while new ones load
+    queryFn: ({ pageParam }) => fetchShopPage(shuffleSeed, filters, pageParam),
+    getNextPageParam: (last, pages) => {
+      const loaded = pages.reduce((n, page) => n + page.items.length, 0)
+      return last.items.length > 0 && loaded < last.total ? loaded : undefined
     },
   })
 
-  // With a search, show only the matches, best match first. Without one, show everything in a fresh order each
-  // time the shop opens: newer and discounted items are favoured, with some older stock mixed in. The same order
-  // is kept while you stay, so items don't jump around.
-  const products =
-    term && allProducts
-      ? searchProducts(allProducts, term).map((h) => h.item)
-      : allProducts && shopOrder(allProducts, shuffleSeed)
+  // SEARCHING: the database finds every item that could match the words. They are then ranked on the device
+  // (see lib/search.ts: name first, then category, colour and size, details, description, with typos and
+  // alternative words allowed) and shown a page at a time.
+  const candidates = useQuery({
+    queryKey: queryKeys.products.search(term, categoryId ?? null, minNum, maxNum),
+    enabled: searching,
+    staleTime: 60_000,
+    placeholderData: (previous) => previous,
+    queryFn: () => fetchSearchCandidates(term, filters),
+  })
+  // Ranking 120 items is quick, and the words of each item are remembered by searchProducts() itself.
+  const ranked = candidates.data ? searchProducts(candidates.data, term).map((h) => h.item) : undefined
+
+  // How many ranked search results are on screen. It starts again whenever the search or filters change.
+  const resetKey = [term, categoryId ?? '', minNum, maxNum].join('|')
+  const [shownState, setShownState] = useState({ key: resetKey, count: SHOP_PAGE_SIZE })
+  const shown = shownState.key === resetKey ? shownState.count : SHOP_PAGE_SIZE
+
+  const browsed = useMemo(() => {
+    if (!browse.data) return undefined
+    // A new item added while you scroll can move things by one place, so make sure none shows twice.
+    const seen = new Map(browse.data.pages.flatMap((page) => page.items).map((p) => [p.id, p]))
+    return [...seen.values()]
+  }, [browse.data])
+
+  const products = searching ? ranked?.slice(0, shown) : browsed
+  const totalFound = searching ? ranked?.length : browse.data?.pages[0]?.total
+  const capped = searching && (candidates.data?.length ?? 0) >= SEARCH_CANDIDATE_LIMIT
+  const hasMore = searching ? (ranked?.length ?? 0) > shown : Boolean(browse.hasNextPage)
+  const isLoading = searching ? candidates.isLoading : browse.isLoading
+  const isPlaceholderData = searching ? candidates.isPlaceholderData : browse.isPlaceholderData
+  const loadingMore = !searching && browse.isFetchingNextPage
+  const error = searching ? candidates.error : browse.error
+
+  const loadMore = () => {
+    if (searching) setShownState({ key: resetKey, count: shown + SHOP_PAGE_SIZE })
+    else if (!browse.isFetchingNextPage) void browse.fetchNextPage()
+  }
+
+  // Load the next page just before the bottom of the list scrolls into view.
+  const sentinel = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = sentinel.current
+    if (!el || !hasMore) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !loadingMore && !isPlaceholderData) loadMore()
+      },
+      { rootMargin: '600px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  })
 
   const filtering = term !== '' || hasPrice
 
@@ -283,9 +314,10 @@ export default function Shop() {
           <button type="button" onClick={clearAll} className="font-medium text-brand underline">
             Clear search and filters
           </button>
-          {products && (
+          {totalFound !== undefined && (
             <span className="text-gray-500">
-              · {products.length} {products.length === 1 ? 'item' : 'items'} found
+              · {totalFound}
+              {capped ? '+' : ''} {totalFound === 1 ? 'item' : 'items'} found
             </span>
           )}
         </div>
@@ -314,6 +346,24 @@ export default function Shop() {
           <ProductCard key={p.id} product={p} />
         ))}
       </div>
+
+      {hasMore && (
+        <div ref={sentinel} className="mt-8 flex justify-center">
+          <button
+            type="button"
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="rounded-full border border-gray-200 px-6 py-2.5 text-sm font-medium text-gray-600 hover:border-brand disabled:opacity-60"
+          >
+            {loadingMore ? 'Loading…' : 'Show more'}
+          </button>
+        </div>
+      )}
+      {capped && !hasMore && (
+        <p className="mt-6 text-center text-sm text-gray-500">
+          Showing the best matches. Add another word to narrow the search.
+        </p>
+      )}
     </div>
   )
 }

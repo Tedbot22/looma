@@ -4,16 +4,18 @@ import { ListSkeleton } from '../../components/Skeleton'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Eye, EyeOff, FolderCog, ImageOff, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { supabase } from '../../lib/supabase'
 import { formatNaira } from '../../lib/format'
-import { deleteProduct } from '../../lib/products'
+import {
+  deleteProduct,
+  fetchAdminProducts,
+  moveProductsToCategory,
+  setProductsActive,
+  type AdminProduct,
+} from '../../api/adminCatalog'
+import { fetchCategories } from '../../api/catalog'
+import { errorMessage } from '../../api/db'
+import { invalidateAll, queryKeys } from '../../api/queryKeys'
 import ConfirmDialog from '../../components/admin/ConfirmDialog'
-import type { Category, Product } from '../../lib/types'
-
-type AdminProduct = Product & {
-  categories: { name: string } | null
-  product_variants: { stock: number; is_active: boolean }[]
-}
 
 const chip = (active: boolean) =>
   `shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-sm ${
@@ -29,33 +31,20 @@ export default function AdminProducts() {
   const [busy, setBusy] = useState(false)
 
   const { data: products, isLoading, error } = useQuery({
-    queryKey: ['admin-products'],
-    queryFn: async (): Promise<AdminProduct[]> => {
-      // The admin RLS policy lets the owner see hidden products too.
-      const { data, error } = await supabase
-        .from('products')
-        .select('*, categories(name), product_variants(stock, is_active)')
-        .order('created_at', { ascending: false })
-      if (error) throw error
-      return data as unknown as AdminProduct[]
-    },
+    queryKey: queryKeys.admin.products(),
+    queryFn: fetchAdminProducts, // the owner's access rules include hidden products
   })
 
-  const { data: categories } = useQuery({
-    queryKey: ['categories'],
-    queryFn: async (): Promise<Category[]> => {
-      const { data, error } = await supabase.from('categories').select('*').order('sort_order')
-      if (error) throw error
-      return data
-    },
-  })
+  const { data: categories } = useQuery({ queryKey: queryKeys.categories(), queryFn: fetchCategories })
 
   const refresh = () =>
-    Promise.all(
-      ['admin-products', 'admin-categories', 'products', 'product', 'variant-info'].map((k) =>
-        queryClient.invalidateQueries({ queryKey: [k] })
-      )
-    )
+    invalidateAll(queryClient, [
+      queryKeys.admin.products(),
+      queryKeys.admin.categories(),
+      queryKeys.products.root(),
+      queryKeys.product.root(),
+      queryKeys.variantInfo.root(),
+    ])
 
   const counts = useMemo(() => {
     const m = new Map<string, number>()
@@ -94,12 +83,13 @@ export default function AdminProducts() {
 
   async function setVisibility(items: AdminProduct[], active: boolean) {
     setBusy(true)
-    const { error } = await supabase
-      .from('products')
-      .update({ is_active: active })
-      .in('id', items.map((p) => p.id))
-    setBusy(false)
-    if (error) return toast.error(error.message)
+    try {
+      await setProductsActive(items.map((p) => p.id), active)
+    } catch (err) {
+      return toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
     toast.success(
       items.length === 1
         ? active ? 'Product is now visible in the store' : 'Product hidden from the store'
@@ -111,12 +101,13 @@ export default function AdminProducts() {
   async function moveToCategory(categoryId: string) {
     if (!categoryId || selectedProducts.length === 0) return
     setBusy(true)
-    const { error } = await supabase
-      .from('products')
-      .update({ category_id: categoryId })
-      .in('id', selectedProducts.map((p) => p.id))
-    setBusy(false)
-    if (error) return toast.error(error.message)
+    try {
+      await moveProductsToCategory(selectedProducts.map((p) => p.id), categoryId)
+    } catch (err) {
+      return toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
     const name = categories?.find((c) => c.id === categoryId)?.name ?? 'the category'
     toast.success(`Moved ${selectedProducts.length} to ${name}`)
     setSelected(new Set())

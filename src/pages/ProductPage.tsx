@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Heart, MessageCircle, Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { supabase } from '../lib/supabase'
 import { discountPercent, formatNaira } from '../lib/format'
 import { whatsappLink } from '../lib/whatsapp'
 import { absoluteUrl, pageTitle, tidy, useSeo } from '../lib/seo'
@@ -20,7 +19,9 @@ import YouMayAlsoLike from '../components/YouMayAlsoLike'
 import StoreReviewsLink from '../components/StoreReviewsLink'
 import ProductReviews from '../components/ProductReviews'
 import { ProductPageSkeleton } from '../components/Skeleton'
-import type { ProductVariant, ProductWithVariants } from '../lib/types'
+import type { ProductVariant } from '../lib/types'
+import { fetchProduct } from '../api/catalog'
+import { queryKeys } from '../api/queryKeys'
 
 function variantLabel(v: ProductVariant): string {
   return [v.color, v.size].filter(Boolean).join(' / ') || 'Standard'
@@ -39,17 +40,8 @@ export default function ProductPage() {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['product', productId],
-    queryFn: async (): Promise<ProductWithVariants | null> => {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*, categories(name), product_variants(*)')
-        .eq('id', productId!)
-        .eq('is_active', true)
-        .maybeSingle()
-      if (error) throw error
-      return data as ProductWithVariants | null
-    },
+    queryKey: queryKeys.product.detail(productId),
+    queryFn: () => fetchProduct(productId!),
     enabled: !!productId,
   })
 

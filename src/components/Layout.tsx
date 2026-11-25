@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Link, NavLink, Outlet, useLocation, useSearchParams } from 'react-router-dom'
+import RouteErrorBoundary from './RouteErrorBoundary'
 import { ShoppingCart, User } from 'lucide-react'
 import { REFERRAL_KEY } from '../config'
 import { PAGE_WIDTH } from '../lib/layout'
@@ -103,7 +104,9 @@ export default function Layout() {
 
       {/* <Outlet /> is where the current page renders */}
       <main className={`${PAGE_WIDTH} flex-1 py-6`}>
-        <Outlet />
+        <RouteErrorBoundary>
+          <Outlet />
+        </RouteErrorBoundary>
       </main>
 
       <ReviewPromptBanner />

@@ -3,12 +3,14 @@ import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, Bike, Copy, History, Link2, RefreshCw, Send, UserRoundPlus, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { useDialog } from '../context/DialogContext'
-import { supabase } from '../lib/supabase'
+import { errorMessage } from '../api/db'
+import { fetchDeliveryEvents, runDeliveryAction, type DeliveryAction } from '../api/delivery'
+import { queryKeys } from '../api/queryKeys'
 import { whatsappLinkTo } from '../lib/whatsapp'
 import {
   ACTIVE_STATUSES, ASSIGNMENT_LABEL, ASSIGNMENT_STYLE, EVENT_LABEL, eventDetail, friendlyDeliveryError,
   isValidRider, riderLink, riderMessage, when,
-  type DeliveryAssignment, type DeliveryEvent, type LinkResult,
+  type DeliveryAssignment, type LinkResult,
 } from '../lib/adminDelivery'
 
 // The owner's delivery tools for ONE order: assign a rider, share the link on WhatsApp,
@@ -42,30 +44,25 @@ export default function AdminDeliveryPanel({ orderId, orderNumber, orderStatus, 
   const canAssign = !active && ['placed', 'confirmed', 'out_for_delivery'].includes(orderStatus)
 
   const { data: events, isLoading: loadingEvents } = useQuery({
-    queryKey: ['delivery-events', orderId],
-    queryFn: async (): Promise<DeliveryEvent[]> => {
-      const { data, error } = await supabase
-        .from('delivery_events')
-        .select('id, event_type, outcome, actor, detail, created_at')
-        .eq('order_id', orderId)
-        .order('created_at')
-      if (error) throw error
-      return data as DeliveryEvent[]
-    },
+    queryKey: queryKeys.admin.deliveryEvents(orderId),
+    queryFn: () => fetchDeliveryEvents(orderId),
     enabled: showHistory,
     refetchInterval: showHistory ? 10_000 : false,
   })
 
   // One place that calls the database, handles errors, and refreshes.
-  async function call(fn: string, args: Record<string, unknown>, onOk?: (data: unknown) => void) {
+  async function call(action: DeliveryAction, args: Record<string, unknown>, onOk?: (data: unknown) => void) {
     if (busy) return false
     setBusy(true)
-    const { data, error } = await supabase.rpc(fn, args)
-    setBusy(false)
-    if (error) {
-      toast.error(friendlyDeliveryError(error.message))
+    let data: unknown
+    try {
+      data = await runDeliveryAction(action, args)
+    } catch (err) {
+      setBusy(false)
+      toast.error(friendlyDeliveryError(errorMessage(err)))
       return false
     }
+    setBusy(false)
     onOk?.(data)
     onChanged()
     return true

@@ -1,22 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, MessageSquareText, Phone, QrCode, ShieldAlert } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { errorMessage } from '../api/db'
+import { createDeliveryQr, fetchMyDelivery } from '../api/delivery'
+import { queryKeys } from '../api/queryKeys'
 
 // The customer's side of delivery verification.
 // Shown on the order page only while a rider is assigned. The customer shows a QR code for the
 // rider to scan. If that isn't possible, the RIDER can ask for a 6-digit code to be texted to the
 // phone number on the order: the customer doesn't need this page for that, and the code is never
 // shown on any screen. The server decides whether any code is valid.
-
-interface MyDelivery {
-  status: 'assigned' | 'out_for_delivery' | 'qr_verified' | 'delivered' | 'failed' | 'cancelled' | 'reassigned'
-  rider_name: string
-  rider_phone: string
-  dispatch_company: string | null
-  active: boolean
-  qr_verified: boolean
-}
 
 // What is on screen right now. Held in memory only: never stored, never put in the address bar.
 type Shown = { image: string; expiresAtMs: number }
@@ -44,12 +37,8 @@ export default function DeliveryQr({ orderId }: { orderId: string }) {
   // Who is delivering, and how far verification has got. Checked often while a code is on screen,
   // so the page reacts the moment the rider verifies.
   const { data: delivery } = useQuery({
-    queryKey: ['my-delivery', orderId],
-    queryFn: async (): Promise<MyDelivery | null> => {
-      const { data, error } = await supabase.rpc('my_delivery', { p_order_id: orderId })
-      if (error) throw error
-      return (data as MyDelivery | null) ?? null
-    },
+    queryKey: queryKeys.delivery.mine(orderId),
+    queryFn: () => fetchMyDelivery(orderId),
     refetchInterval: shown ? 2500 : 8000,
   })
 
@@ -73,8 +62,8 @@ export default function DeliveryQr({ orderId }: { orderId: string }) {
   // Once the delivery is finished, refresh the order so the page shows "Delivered".
   useEffect(() => {
     if (delivery?.status === 'delivered') {
-      queryClient.invalidateQueries({ queryKey: ['order', orderId] })
-      queryClient.invalidateQueries({ queryKey: ['order-events', orderId] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(orderId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.events(orderId) })
     }
   }, [delivery?.status, orderId, queryClient])
 
@@ -84,17 +73,22 @@ export default function DeliveryQr({ orderId }: { orderId: string }) {
     setBusy(true)
     setError(null)
     try {
-      const { data, error: rpcError } = await supabase.rpc('create_delivery_qr', { p_order_id: orderId })
-      if (rpcError || !data) {
-        setError(errorText(rpcError?.message))
+      let reply
+      try {
+        reply = await createDeliveryQr(orderId)
+      } catch (err) {
+        setError(errorText(errorMessage(err)))
         return
       }
-      const reply = data as { token: string; expires_in_seconds: number }
+      if (!reply) {
+        setError(errorText(undefined))
+        return
+      }
       const { default: QRCode } = await import('qrcode')
       const image = await QRCode.toDataURL(reply.token, { width: 320, margin: 2, errorCorrectionLevel: 'M' })
       setNow(Date.now())
       setShown({ image, expiresAtMs: Date.now() + reply.expires_in_seconds * 1000 })
-      queryClient.invalidateQueries({ queryKey: ['my-delivery', orderId] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.delivery.mine(orderId) })
     } catch {
       setError(errorText(undefined))
     } finally {

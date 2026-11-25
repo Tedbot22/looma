@@ -1,26 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { fetchSitePage } from '../api/content'
+import { queryKeys } from '../api/queryKeys'
 import { FaqAccordion, RichText } from '../components/RichText'
 import { Skeleton } from '../components/Skeleton'
-
-interface SitePage {
-  slug: string
-  title: string
-  content: string
-  updated_at: string
-}
 
 // One page whose text the owner can edit in Admin > Store (About, FAQ, Privacy Policy, Terms).
 // The FAQ shows each question as a section that opens to reveal its answer.
 export default function ContentPage({ slug, accordion = false }: { slug: string; accordion?: boolean }) {
   const { data: page, isLoading } = useQuery({
-    queryKey: ['site-page', slug],
-    queryFn: async (): Promise<SitePage | null> => {
-      const { data, error } = await supabase.from('site_pages').select('*').eq('slug', slug).maybeSingle()
-      if (error) throw error
-      return data as SitePage | null
-    },
+    queryKey: queryKeys.sitePage(slug),
+    queryFn: () => fetchSitePage(slug),
     staleTime: 10 * 60_000,
   })
 

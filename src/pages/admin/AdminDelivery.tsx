@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Eye, EyeOff, Plus } from 'lucide-react'
 import { toast } from 'sonner'
-import { supabase } from '../../lib/supabase'
+import { errorCode, errorMessage } from '../../api/db'
+import { addCampusZone, fetchAllZones, setZoneActive, updateZone } from '../../api/delivery'
+import { invalidateAll, queryKeys } from '../../api/queryKeys'
 import type { DeliveryZone } from '../../lib/types'
 import { parseLatLon } from '../../lib/coordinates'
 import DistancePricingPanel from './DistancePricingPanel'
@@ -10,8 +12,8 @@ import DistancePricingPanel from './DistancePricingPanel'
 const inputClass =
   'w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand'
 
-function friendly(err: { code?: string; message: string }) {
-  return err.code === '23505' ? 'An option with that name already exists.' : err.message
+function friendly(err: unknown) {
+  return errorCode(err) === '23505' ? 'An option with that name already exists.' : errorMessage(err)
 }
 
 // One delivery option: rename it, change its fee, or switch it off.
@@ -38,25 +40,31 @@ function ZoneCard({ zone, onChanged }: { zone: DeliveryZone; onChanged: () => vo
     }
 
     setBusy(true)
-    const { error } = await supabase
-      .from('delivery_zones')
-      .update(
+    try {
+      await updateZone(
+        zone.id,
         isHome
           ? { name: name.trim() }
           : { name: name.trim(), fee: feeNumber, latitude: point?.lat ?? null, longitude: point?.lon ?? null }
       )
-      .eq('id', zone.id)
+    } catch (err) {
+      setBusy(false)
+      return toast.error(friendly(err))
+    }
     setBusy(false)
-    if (error) return toast.error(friendly(error))
     toast.success('Saved')
     onChanged()
   }
 
   async function toggleActive() {
     setBusy(true)
-    const { error } = await supabase.from('delivery_zones').update({ is_active: !zone.is_active }).eq('id', zone.id)
+    try {
+      await setZoneActive(zone.id, !zone.is_active)
+    } catch (err) {
+      setBusy(false)
+      return toast.error(errorMessage(err))
+    }
     setBusy(false)
-    if (error) return toast.error(error.message)
     toast.success(zone.is_active ? 'Switched off. Customers can no longer choose it.' : 'Switched on.')
     onChanged()
   }
@@ -121,20 +129,13 @@ export default function AdminDelivery() {
   const [adding, setAdding] = useState(false)
 
   const { data: zones, isLoading, error } = useQuery({
-    queryKey: ['admin-zones'],
-    queryFn: async (): Promise<DeliveryZone[]> => {
-      // The admin's access rules let the owner see switched-off options too.
-      const { data, error } = await supabase.from('delivery_zones').select('*').order('sort_order')
-      if (error) throw error
-      return data as DeliveryZone[]
-    },
+    queryKey: queryKeys.admin.zones(),
+    queryFn: fetchAllZones, // the owner's access rules include switched-off options
   })
 
   // Customers' pages cache these lists, so refresh them everywhere after a change.
   const refresh = () =>
-    Promise.all(
-      ['admin-zones', 'delivery-zones', 'addresses'].map((k) => queryClient.invalidateQueries({ queryKey: [k] }))
-    )
+    invalidateAll(queryClient, [queryKeys.admin.zones(), queryKeys.deliveryZones(), queryKeys.account.addressesRoot()])
 
   async function addCampus() {
     const feeNumber = Number(newFee)
@@ -149,11 +150,13 @@ export default function AdminDelivery() {
 
     setAdding(true)
     const nextOrder = Math.max(0, ...(zones ?? []).map((z) => z.sort_order)) + 1
-    const { error } = await supabase
-      .from('delivery_zones')
-      .insert({ name: newName.trim(), fee: feeNumber, kind: 'campus', sort_order: nextOrder, latitude: point?.lat ?? null, longitude: point?.lon ?? null })
+    try {
+      await addCampusZone({ name: newName.trim(), fee: feeNumber, sortOrder: nextOrder, latitude: point?.lat ?? null, longitude: point?.lon ?? null })
+    } catch (err) {
+      setAdding(false)
+      return toast.error(friendly(err))
+    }
     setAdding(false)
-    if (error) return toast.error(friendly(error))
 
     toast.success('Campus added')
     setNewName('')

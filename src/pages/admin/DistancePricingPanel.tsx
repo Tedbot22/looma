@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
-import { supabase } from '../../lib/supabase'
+import { errorMessage } from '../../api/db'
+import { queryKeys } from '../../api/queryKeys'
+import { saveAppSettings } from '../../api/settings'
 import { formatNaira } from '../../lib/format'
 import { calculateFee } from '../../lib/delivery'
 import { useAppSettings } from '../../hooks/useAppSettings'
@@ -67,9 +69,13 @@ export default function DistancePricingPanel() {
     ]
 
     setSaving(true)
-    const { error } = await supabase.from('app_settings').upsert(rows, { onConflict: 'key' })
+    try {
+      await saveAppSettings(rows)
+    } catch (err) {
+      setSaving(false)
+      return toast.error(errorMessage(err))
+    }
     setSaving(false)
-    if (error) return toast.error(error.message)
 
     toast.success('Delivery pricing saved')
     setBaseInput(null)
@@ -77,7 +83,7 @@ export default function DistancePricingPanel() {
     setRoundInput(null)
     setOriginText(null)
     setOrigin(null)
-    queryClient.invalidateQueries({ queryKey: ['app-settings'] })
+    queryClient.invalidateQueries({ queryKey: queryKeys.appSettings() })
   }
 
   return (

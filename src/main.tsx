@@ -5,6 +5,7 @@ import { Toaster } from 'sonner'
 import './index.css'
 import './lib/install' // starts listening for the browser's install event right away
 import App from './App'
+import { installGlobalErrorHandlers } from './lib/errorReporting'
 import { CartProvider } from './context/CartContext'
 import { WishlistProvider } from './context/WishlistContext'
 import { AuthProvider } from './context/AuthContext'
@@ -19,6 +20,8 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+installGlobalErrorHandlers()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

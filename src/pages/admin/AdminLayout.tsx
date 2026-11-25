@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import RouteErrorBoundary from '../../components/RouteErrorBoundary'
 import {
   Bell,
   ExternalLink,
@@ -21,7 +22,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
+import { countNewOrders, countOpenPaymentIssues, countWaitingSupport } from '../../api/adminOrders'
+import { queryKeys } from '../../api/queryKeys'
 import { STORE_NAME } from '../../config'
 import PushToggle from './PushToggle'
 
@@ -42,31 +44,22 @@ export default function AdminLayout() {
 
   // How many payment problems are waiting for the owner (shown as a count next to Payments).
   const { data: openIssues } = useQuery({
-    queryKey: ['payment-issues-count'],
-    queryFn: async () => {
-      const { count } = await supabase.from('payment_issues').select('id', { count: 'exact', head: true }).is('resolved_at', null)
-      return count ?? 0
-    },
+    queryKey: queryKeys.admin.counts.paymentIssues(),
+    queryFn: countOpenPaymentIssues,
     refetchInterval: 30_000,
   })
 
   // How many customers the AI has handed over and are still waiting for the owner.
   const { data: waiting } = useQuery({
-    queryKey: ['support-count'],
-    queryFn: async () => {
-      const { count } = await supabase.from('support_conversations').select('id', { count: 'exact', head: true }).eq('status', 'escalated')
-      return count ?? 0
-    },
+    queryKey: queryKeys.admin.counts.support(),
+    queryFn: countWaitingSupport,
     refetchInterval: 30_000,
   })
 
   // New orders waiting to be confirmed.
   const { data: newOrders } = useQuery({
-    queryKey: ['new-orders-count'],
-    queryFn: async () => {
-      const { count } = await supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'placed')
-      return count ?? 0
-    },
+    queryKey: queryKeys.admin.counts.newOrders(),
+    queryFn: countNewOrders,
     refetchInterval: 30_000,
   })
 
@@ -184,7 +177,9 @@ export default function AdminLayout() {
 
         <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
           <PushToggle />
-          <Outlet />
+          <RouteErrorBoundary>
+            <Outlet />
+          </RouteErrorBoundary>
         </main>
       </div>
     </div>

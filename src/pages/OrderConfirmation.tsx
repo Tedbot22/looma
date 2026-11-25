@@ -9,12 +9,14 @@ import { supabase } from '../lib/supabase'
 import { formatNaira } from '../lib/format'
 import { whatsappLink } from '../lib/whatsapp'
 import { useCart } from '../context/CartContext'
-import { cancelOrder, startPayment, verifyPayment } from '../lib/payments'
+import { fetchOrder, fetchOrderEvents } from '../api/orders'
+import { cancelOrder, startPayment, verifyPayment } from '../api/payments'
+import { queryKeys } from '../api/queryKeys'
 import OrderTimeline from '../components/OrderTimeline'
 import DeliveryQr from '../components/DeliveryQr'
 import { OrderReviewSection } from '../components/RateOrder'
 import OrderAlertsCard from '../components/OrderAlertsCard'
-import type { OrderEvent, OrderWithItems } from '../lib/types'
+import type { OrderWithItems } from '../lib/types'
 
 const STATUS_LABEL: Record<OrderWithItems['status'], string> = {
   pending_payment: 'Awaiting payment',
@@ -49,33 +51,16 @@ export default function OrderConfirmation() {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['order', orderId],
-    queryFn: async (): Promise<OrderWithItems | null> => {
-      // RLS guarantees you can only read your own orders.
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*, order_items(*)')
-        .eq('id', orderId!)
-        .maybeSingle()
-      if (error) throw error
-      return data as OrderWithItems | null
-    },
+    queryKey: queryKeys.orders.detail(orderId),
+    queryFn: () => fetchOrder(orderId!), // the database only lets you read your own orders
     enabled: !!orderId,
     // While we wait for a payment to be confirmed, check every few seconds.
     refetchInterval: (query) => (query.state.data?.status === 'pending_payment' ? 4000 : false),
   })
 
   const { data: events = [] } = useQuery({
-    queryKey: ['order-events', orderId],
-    queryFn: async (): Promise<OrderEvent[]> => {
-      const { data, error } = await supabase
-        .from('order_events')
-        .select('*')
-        .eq('order_id', orderId!)
-        .order('created_at')
-      if (error) throw error
-      return data as OrderEvent[]
-    },
+    queryKey: queryKeys.orders.events(orderId),
+    queryFn: () => fetchOrderEvents(orderId!),
     enabled: !!orderId,
   })
 
@@ -88,8 +73,8 @@ export default function OrderConfirmation() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['order', orderId] })
-          queryClient.invalidateQueries({ queryKey: ['order-events', orderId] })
+          queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(orderId) })
+          queryClient.invalidateQueries({ queryKey: queryKeys.orders.events(orderId) })
         }
       )
       .subscribe()
@@ -126,8 +111,8 @@ export default function OrderConfirmation() {
       })
       .catch((err) => showProblem((err as Error).message))
       .finally(() => {
-        queryClient.invalidateQueries({ queryKey: ['order', orderId] })
-        queryClient.invalidateQueries({ queryKey: ['order-events', orderId] })
+        queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(orderId) })
+        queryClient.invalidateQueries({ queryKey: queryKeys.orders.events(orderId) })
         setParams({}, { replace: true }) // tidy the address bar
       })
   }, [orderId, reference, queryClient, setParams])
@@ -151,8 +136,8 @@ export default function OrderConfirmation() {
     },
     onError: (err) => toast.error((err as Error).message),
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['order', orderId] })
-      queryClient.invalidateQueries({ queryKey: ['order-events', orderId] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(orderId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.events(orderId) })
     },
   })
 

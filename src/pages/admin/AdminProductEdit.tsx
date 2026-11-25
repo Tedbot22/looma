@@ -1,23 +1,15 @@
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
+import { fetchAdminProduct } from '../../api/adminCatalog'
+import { queryKeys } from '../../api/queryKeys'
 import ProductForm from './ProductForm'
-import type { ProductWithVariants } from '../../lib/types'
 
 export default function AdminProductEdit() {
   const { productId } = useParams()
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['admin-product', productId],
-    queryFn: async (): Promise<ProductWithVariants | null> => {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*, product_variants(*)')
-        .eq('id', productId!)
-        .maybeSingle()
-      if (error) throw error
-      return data as ProductWithVariants | null
-    },
+    queryKey: queryKeys.admin.product(productId),
+    queryFn: () => fetchAdminProduct(productId!),
     enabled: !!productId,
     staleTime: 0, // always edit fresh data, never a cached copy
     gcTime: 0,

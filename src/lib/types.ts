@@ -7,6 +7,45 @@ export interface Category {
   sort_order: number
 }
 
+// One line in a customer's cart.
+export interface CartItem {
+  variantId: string
+  productId: string
+  name: string
+  variantLabel: string
+  price: number
+  image: string | null
+  quantity: number
+  maxStock: number // stock when last loaded: a UX hint only. The database is the real gatekeeper.
+}
+
+// One saved item on a customer's wishlist.
+export interface WishlistItem {
+  variantId: string
+  productId: string
+  name: string
+  variantLabel: string
+  price: number
+  image: string | null
+  autoMoved?: boolean // true when the system moved it here from the cart because it sold out
+}
+
+// A home page banner as customers see it.
+export interface Banner {
+  id: string
+  image_url: string
+  title: string | null
+  subtitle: string | null
+  button_label: string | null
+  link_url: string | null
+}
+
+// A banner as the owner sees it in the admin (hidden ones included).
+export interface BannerRow extends Banner {
+  sort_order: number
+  is_active: boolean
+}
+
 export interface Product {
   id: string
   category_id: string
@@ -33,7 +72,7 @@ export interface ProductVariant {
 }
 
 // A product together with its variants, as returned by:
-//   supabase.from('products').select('*, product_variants(*)')
+//   products joined with their variants (see src/api/catalog.ts)
 export interface ProductWithVariants extends Product {
   product_variants: ProductVariant[]
   categories?: { name: string } | null // present when the product page asks for it

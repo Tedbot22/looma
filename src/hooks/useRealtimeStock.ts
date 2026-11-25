@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { queryKeys } from '../api/queryKeys'
 
 // Live stock updates. Whenever ANY variant changes in the database (a sale, a restock,
 // the owner editing stock), every open shop page re-checks its data, so items flip to
@@ -20,9 +21,14 @@ export function useRealtimeStock() {
     const refresh = () => {
       clearTimeout(timer)
       timer = setTimeout(() => {
-        for (const key of ['products', 'product', 'variant-info', 'cart', 'wishlist']) {
-          queryClient.invalidateQueries({ queryKey: [key] }) // only re-fetches what's on screen
-        }
+        const keys = [
+          queryKeys.products.root(),
+          queryKeys.product.root(),
+          queryKeys.variantInfo.root(),
+          queryKeys.cart.root(),
+          queryKeys.wishlist.root(),
+        ]
+        for (const queryKey of keys) queryClient.invalidateQueries({ queryKey }) // only re-fetches what's on screen
       }, 400)
     }
 

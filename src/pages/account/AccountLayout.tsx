@@ -1,4 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
+import RouteErrorBoundary from '../../components/RouteErrorBoundary'
 import { ChevronLeft } from 'lucide-react'
 
 // Wraps every page under /account. The menu page stands alone; every other page gets a back link.
@@ -13,7 +14,9 @@ export default function AccountLayout() {
           <ChevronLeft size={16} /> Account
         </Link>
       )}
-      <Outlet />
+      <RouteErrorBoundary>
+        <Outlet />
+      </RouteErrorBoundary>
     </div>
   )
 }

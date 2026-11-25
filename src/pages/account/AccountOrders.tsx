@@ -2,13 +2,12 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ListSkeleton } from '../../components/Skeleton'
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
+import { fetchMyOrders } from '../../api/orders'
+import { queryKeys } from '../../api/queryKeys'
 import { formatNaira } from '../../lib/format'
 import { useAuth } from '../../context/AuthContext'
 import { useMyReviewedOrderIds } from '../../hooks/useReviews'
 import type { Order } from '../../lib/types'
-
-type MyOrder = Pick<Order, 'id' | 'order_number' | 'total' | 'status' | 'created_at'>
 
 const STATUS_LABEL: Record<Order['status'], string> = {
   pending_payment: 'Awaiting payment',
@@ -95,17 +94,8 @@ export default function AccountOrders() {
   }, [page])
 
   const { data: orders, isLoading, error } = useQuery({
-    queryKey: ['my-orders', user?.id],
-    queryFn: async (): Promise<MyOrder[]> => {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('id, order_number, total, status, created_at')
-        .eq('user_id', user!.id)
-        .order('created_at', { ascending: false })
-        .limit(50)
-      if (error) throw error
-      return data as MyOrder[]
-    },
+    queryKey: queryKeys.orders.mine(user?.id),
+    queryFn: () => fetchMyOrders(user!.id),
     enabled: !!user,
   })
 

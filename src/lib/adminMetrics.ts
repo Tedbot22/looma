@@ -1,8 +1,6 @@
-// The numbers on the admin dashboard. They are worked out inside the database (admin_dashboard in
-// supabase/phase9_admin_metrics_and_review_media.sql), so the page downloads a few KB, not every order.
+// The shapes of the admin dashboard's numbers, and a helper for them. The numbers themselves are worked out
+// inside the database (see src/api/adminReports.ts), so the page downloads a few KB, not every order.
 
-import { useQuery } from '@tanstack/react-query'
-import { supabase } from './supabase'
 import type { Order } from './types'
 
 export interface DashboardData {
@@ -24,18 +22,6 @@ export interface DashboardData {
   top_products: { name: string; units: number; revenue: number }[]
   low_stock: { product_id: string; name: string; color: string | null; size: string | null; stock: number }[]
   reviews: { count: number; average: number }
-}
-
-export function useAdminDashboard(days: number) {
-  return useQuery({
-    queryKey: ['admin-dashboard', days],
-    refetchInterval: 60_000,
-    queryFn: async (): Promise<DashboardData> => {
-      const { data, error } = await supabase.rpc('admin_dashboard', { p_days: days })
-      if (error) throw error
-      return data as DashboardData
-    },
-  })
 }
 
 export interface CustomerRow {

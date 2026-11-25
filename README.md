@@ -1,32 +1,55 @@
-# React + TypeScript + Vite
+# Looma
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+An online thrift store: React 19 + TypeScript + Vite on the front, Supabase (database, login, edge functions) behind it, Paystack for payments, hosted on Vercel.
 
-Currently, two official plugins are available:
+## Run it on your computer
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+nvm use            # Node 22 (see .nvmrc)
+npm ci
+cp .env.example .env.local   # then fill in the values below
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+`.env.local` needs:
+
+| Name | What it is |
+| --- | --- |
+| `VITE_SUPABASE_URL` | Your Supabase project address |
+| `VITE_SUPABASE_ANON_KEY` | The project's public (anon) key |
+| `VITE_SITE_URL` | Optional. The store's public address, used for sharing and Google. Vercel fills it in by itself. |
+
+## Everyday commands
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Starts the store with live reload |
+| `npm test` | Runs the automated tests (`npm run test:watch` re-runs them as you edit) |
+| `npm run lint` | Checks the code for common mistakes |
+| `npm run build` | Checks the types, then builds the store for publishing |
+
+Every push and pull request on GitHub runs lint, the tests and the build (see `.github/workflows/ci.yml`). Please keep it green before publishing.
+
+## Where things live
+
+| Folder | What is in it |
+| --- | --- |
+| `src/pages` | One file per page (shop, product, checkout, admin pages...) |
+| `src/components` | Pieces shared between pages (cards, header, dialogs, error screens) |
+| `src/api` | The only place that talks to the database about products. New data access goes here, not in pages. |
+| `src/hooks`, `src/context` | Shared behaviour: cart, wishlist, login, search suggestions |
+| `src/lib` | Plain logic with no screen: search ranking, coupons, deal ordering, formatting. Most tests are here. |
+| `supabase/migrations` | The database, as numbered SQL files. Run them in order. Every database change belongs here. |
+| `supabase/functions` | Edge functions: payments, refunds, notifications, support chat, the push scheduler |
+
+## Changing the database
+
+1. Write the change as the next numbered file in `supabase/migrations` (for example `0006_...sql`).
+2. Make it safe to run twice (`if not exists`, `create or replace`).
+3. Try it on a Supabase branch or a copy of the project first, then on the live one.
+
+Functions that only the server should run (payments, cancelling, push candidates) are locked to the service role. New functions are private by default; grant access on purpose, only to what needs it.
+
+## When something breaks on the live store
+
+Pages are wrapped in error boundaries, so a crash shows a "Something went wrong" message with the header and footer still in place instead of a blank page. Errors are collected in `src/lib/errorReporting.ts`; today they go to the browser console. To send them to a service such as Sentry, call `setErrorReporter(...)` once in `src/main.tsx`.

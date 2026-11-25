@@ -1,19 +1,19 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../lib/supabase'
-import { VARIANT_FIELDS, describeVariant, type VariantEmbed } from '../lib/variants'
+import {
+  clearCart,
+  fetchCart,
+  mergeGuestCart,
+  removeCartItem,
+  removeCartItems,
+  saveCartItem,
+  setCartItemQuantity,
+} from '../api/cart'
+import { queryKeys } from '../api/queryKeys'
+import type { CartItem } from '../lib/types'
 import { useAuth } from './AuthContext'
 
-export interface CartItem {
-  variantId: string
-  productId: string
-  name: string
-  variantLabel: string
-  price: number
-  image: string | null
-  quantity: number
-  maxStock: number // stock when last loaded: a UX hint only. The database is the real gatekeeper.
-}
+export type { CartItem }
 
 interface CartContextValue {
   items: CartItem[]
@@ -42,66 +42,12 @@ function loadGuestCart(): CartItem[] {
   }
 }
 
-async function fetchCart(userId: string): Promise<CartItem[]> {
-  const { data, error } = await supabase
-    .from('cart_items')
-    .select(`variant_id, quantity, product_variants(${VARIANT_FIELDS})`)
-    .eq('user_id', userId)
-    .not('variant_id', 'is', null)
-    .order('created_at')
-  if (error) throw error
-
-  const rows = data as unknown as { quantity: number; product_variants: VariantEmbed | null }[]
-  return rows.flatMap((row) => {
-    const d = describeVariant(row.product_variants)
-    if (!d) return []
-    return [
-      {
-        variantId: d.variantId,
-        productId: d.productId,
-        name: d.name,
-        variantLabel: d.variantLabel,
-        price: d.price,
-        image: d.image,
-        quantity: row.quantity,
-        maxStock: d.stock,
-      },
-    ]
-  })
-}
-
-// When a guest logs in, their browser cart is folded into their account cart.
-// "max" (not "sum") makes this safe to run twice without doubling quantities.
-async function mergeGuestCart(userId: string, guest: CartItem[]) {
-  const { data: existing, error } = await supabase
-    .from('cart_items')
-    .select('variant_id, quantity')
-    .eq('user_id', userId)
-  if (error) throw error
-
-  const have = new Map((existing ?? []).map((r) => [r.variant_id as string, r.quantity as number]))
-  const rows = guest
-    .map((g) => ({
-      user_id: userId,
-      variant_id: g.variantId,
-      quantity: Math.min(g.maxStock, Math.max(have.get(g.variantId) ?? 0, g.quantity)),
-    }))
-    .filter((r) => r.quantity > 0)
-
-  // One bad row (say, an item since deleted) must not block the rest.
-  await Promise.allSettled(
-    rows.map((r) => supabase.from('cart_items').upsert(r, { onConflict: 'user_id,variant_id' }))
-  )
-}
-
 const CartContext = createContext<CartContextValue | null>(null)
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth()
   const userId = user?.id ?? null
   const queryClient = useQueryClient()
-  const queryKey = ['cart', userId]
-
   const [guestItems, setGuestItems] = useState<CartItem[]>(loadGuestCart)
 
   useEffect(() => {
@@ -113,7 +59,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [guestItems])
 
   const serverCart = useQuery({
-    queryKey,
+    queryKey: queryKeys.cart.forUser(userId),
     queryFn: () => fetchCart(userId!),
     enabled: !!userId,
     staleTime: 30_000,
@@ -127,7 +73,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       .then(() => {
         if (cancelled) return
         setGuestItems([])
-        queryClient.invalidateQueries({ queryKey: ['cart', userId] })
+        queryClient.invalidateQueries({ queryKey: queryKeys.cart.forUser(userId) })
       })
       .catch(() => {})
     return () => {
@@ -139,14 +85,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const loading = authLoading || (!!userId && serverCart.isLoading)
 
   const value = useMemo<CartContextValue>(() => {
+    const queryKey = queryKeys.cart.forUser(userId)
     // Update what's on screen immediately, then write to the database in the background.
     // If the write fails, re-fetch so the screen shows the truth again.
     const setServerItems = (update: (prev: CartItem[]) => CartItem[]) =>
-      queryClient.setQueryData<CartItem[]>(['cart', userId], (prev) => update(prev ?? []))
-    const run = (op: PromiseLike<{ error: unknown }>) => {
-      op.then(({ error }) => {
-        if (error) queryClient.invalidateQueries({ queryKey: ['cart', userId] })
-      })
+      queryClient.setQueryData<CartItem[]>(queryKey, (prev) => update(prev ?? []))
+    const sync = (write: Promise<void>) => {
+      write.catch(() => queryClient.invalidateQueries({ queryKey }))
     }
 
     return {
@@ -166,11 +111,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
         if (!userId) return setGuestItems(upsert)
         setServerItems(upsert)
-        run(
-          supabase
-            .from('cart_items')
-            .upsert({ user_id: userId, variant_id: item.variantId, quantity: newQty }, { onConflict: 'user_id,variant_id' })
-        )
+        sync(saveCartItem(userId, item.variantId, newQty))
       },
 
       setQuantity: (variantId, quantity) => {
@@ -181,27 +122,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
         if (!userId) return setGuestItems(update)
         setServerItems(update)
-        run(supabase.from('cart_items').update({ quantity: q }).eq('user_id', userId).eq('variant_id', variantId))
+        sync(setCartItemQuantity(userId, variantId, q))
       },
 
       removeItem: (variantId) => {
         const update = (prev: CartItem[]) => prev.filter((i) => i.variantId !== variantId)
         if (!userId) return setGuestItems(update)
         setServerItems(update)
-        run(supabase.from('cart_items').delete().eq('user_id', userId).eq('variant_id', variantId))
+        sync(removeCartItem(userId, variantId))
       },
 
       removeItems: (variantIds) => {
         const update = (prev: CartItem[]) => prev.filter((i) => !variantIds.includes(i.variantId))
         if (!userId) return setGuestItems(update)
         setServerItems(update)
-        run(supabase.from('cart_items').delete().eq('user_id', userId).in('variant_id', variantIds))
+        sync(removeCartItems(userId, variantIds))
       },
 
       clear: () => {
         if (!userId) return setGuestItems([])
         setServerItems(() => [])
-        run(supabase.from('cart_items').delete().eq('user_id', userId))
+        sync(clearCart(userId))
       },
     }
   }, [items, loading, userId, queryClient])

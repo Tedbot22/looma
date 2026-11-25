@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { detachThisDevice } from '../lib/push'
+import { touchLastSeen } from '../api/account'
 
 interface AuthContextValue {
   user: User | null
@@ -60,10 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const ping = () => {
       if (Date.now() - last < 60 * 60 * 1000) return
       last = Date.now()
-      supabase.rpc('touch_last_seen').then(
-        () => {},
-        () => {}
-      )
+      touchLastSeen()
     }
     ping()
     const onVisible = () => document.visibilityState === 'visible' && ping()

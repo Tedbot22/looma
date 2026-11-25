@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Search } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { fetchAdminCustomers } from '../../api/adminReports'
+import { queryKeys } from '../../api/queryKeys'
 import { formatNaira } from '../../lib/format'
 import { whatsappLinkTo } from '../../lib/whatsapp'
-import type { CustomerRow } from '../../lib/adminMetrics'
 import { ListSkeleton } from '../../components/Skeleton'
 
 const PAGE = 25
@@ -25,17 +25,9 @@ export default function AdminCustomers() {
   }, [input])
 
   const { data, isLoading, error, isFetching } = useQuery({
-    queryKey: ['admin-customers', search, page],
+    queryKey: queryKeys.admin.customers(search, page),
     placeholderData: (prev) => prev,
-    queryFn: async (): Promise<{ total: number; rows: CustomerRow[] }> => {
-      const { data, error } = await supabase.rpc('admin_customers', {
-        p_search: search || null,
-        p_limit: PAGE,
-        p_offset: page * PAGE,
-      })
-      if (error) throw error
-      return data as { total: number; rows: CustomerRow[] }
-    },
+    queryFn: () => fetchAdminCustomers(search, PAGE, page * PAGE),
   })
 
   const total = data?.total ?? 0

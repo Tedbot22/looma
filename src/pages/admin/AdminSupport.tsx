@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { STORE_NAME } from '../../config'
 import { whatsappDigits, type SupportMessage } from '../../lib/support'
 import { ListSkeleton } from '../../components/Skeleton'
+import { queryKeys } from '../../api/queryKeys'
 
 interface Chat {
   id: string
@@ -54,7 +55,7 @@ export default function AdminSupport() {
     if (error) return toast.error(error.message)
     toast.success('Marked as resolved')
     queryClient.invalidateQueries({ queryKey: ['admin-support'] })
-    queryClient.invalidateQueries({ queryKey: ['support-count'] })
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.counts.support() })
   }
 
   return (

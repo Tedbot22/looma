@@ -2,30 +2,19 @@ import { useState } from 'react'
 import { ProductGridSkeleton } from '../../components/Skeleton'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
 import { clearRecentIds, getRecentIds } from '../../lib/recentlyViewed'
 import ProductCard from '../../components/ProductCard'
-import type { ProductWithVariants } from '../../lib/types'
+import { fetchProductsInOrder } from '../../api/catalog'
+import { queryKeys } from '../../api/queryKeys'
 
 export default function RecentlyViewed() {
   const [ids, setIds] = useState<string[]>(getRecentIds)
 
   const { data: products, isLoading } = useQuery({
     // Starts with "products" so live stock updates refresh this list too.
-    queryKey: ['products', 'recent', ids],
+    queryKey: queryKeys.products.recent(ids),
     enabled: ids.length > 0,
-    queryFn: async (): Promise<ProductWithVariants[]> => {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*, product_variants(*)')
-        .in('id', ids)
-        .eq('is_active', true)
-      if (error) throw error
-
-      // The database returns them in any order. Put them back in "most recent first".
-      const byId = new Map((data as ProductWithVariants[]).map((p) => [p.id, p]))
-      return ids.flatMap((id) => byId.get(id) ?? [])
-    },
+    queryFn: () => fetchProductsInOrder(ids), // the database returns them in any order; this puts them back in "most recent first"
   })
 
   function clear() {

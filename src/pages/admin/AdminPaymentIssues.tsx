@@ -3,18 +3,9 @@ import { Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { useDialog } from '../../context/DialogContext'
 import { ListSkeleton } from '../../components/Skeleton'
-import { supabase } from '../../lib/supabase'
-import { retryRefund } from '../../lib/payments'
-
-interface PaymentIssue {
-  id: string
-  order_id: string | null
-  reference: string | null
-  kind: 'refund_failed' | 'refund_needs_attention' | 'payment_mismatch' | 'dispute' | 'other'
-  detail: string | null
-  created_at: string
-  orders: { order_number: number | string; phone: string | null; profiles: { full_name: string | null } | null } | null
-}
+import { fetchOpenPaymentIssues, resolvePaymentIssue, type PaymentIssue } from '../../api/adminOrders'
+import { retryRefund } from '../../api/payments'
+import { queryKeys } from '../../api/queryKeys'
 
 const KIND_LABEL: Record<PaymentIssue['kind'], string> = {
   refund_failed: 'Refund failed',
@@ -39,23 +30,15 @@ export default function AdminPaymentIssues() {
   const queryClient = useQueryClient()
 
   const { data: issues, isLoading, error } = useQuery({
-    queryKey: ['payment-issues'],
-    queryFn: async (): Promise<PaymentIssue[]> => {
-      const { data, error } = await supabase
-        .from('payment_issues')
-        .select('*, orders(order_number, phone, profiles(full_name))')
-        .is('resolved_at', null)
-        .order('created_at', { ascending: false })
-      if (error) throw error
-      return data as unknown as PaymentIssue[]
-    },
+    queryKey: queryKeys.admin.paymentIssues(),
+    queryFn: fetchOpenPaymentIssues,
     refetchInterval: 30_000,
   })
 
   function refresh() {
-    queryClient.invalidateQueries({ queryKey: ['payment-issues'] })
-    queryClient.invalidateQueries({ queryKey: ['payment-issues-count'] })
-    queryClient.invalidateQueries({ queryKey: ['admin-orders'] })
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.paymentIssues() })
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.counts.paymentIssues() })
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.ordersRoot() })
   }
 
   const retry = useMutation({
@@ -69,14 +52,7 @@ export default function AdminPaymentIssues() {
   })
 
   const resolve = useMutation({
-    mutationFn: async (id: string) => {
-      const { data: auth } = await supabase.auth.getUser()
-      const { error } = await supabase
-        .from('payment_issues')
-        .update({ resolved_at: new Date().toISOString(), resolved_by: auth.user?.id })
-        .eq('id', id)
-      if (error) throw error
-    },
+    mutationFn: resolvePaymentIssue,
     onSuccess: () => {
       toast.success('Marked as resolved')
       refresh()

@@ -1,0 +1,16 @@
+# Files that still talk to the database directly, waiting to be moved into src/api.
+# This list can only shrink: see directAccess.test.ts. When you move a file's queries into src/api,
+# delete its line here. Keep it sorted, one path per line.
+src/hooks/useCustomerPush.ts
+src/hooks/useMarketingPref.ts
+src/hooks/useReviews.ts
+src/lib/images.ts
+src/lib/push.ts
+src/lib/reviewMedia.ts
+src/lib/rider.ts
+src/lib/support.ts
+src/pages/SubmitReview.tsx
+src/pages/admin/AdminNotifications.tsx
+src/pages/admin/AdminReviews.tsx
+src/pages/admin/AdminSupport.tsx
+src/pages/admin/PushToggle.tsx

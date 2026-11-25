@@ -1,5 +1,3 @@
-import { callFunction } from './payments'
-
 // A price quote for delivering to one exact address. The server made it, and checkout
 // sends only quote_id to place_order, which reads the fee from the saved quote.
 export interface Quote {
@@ -10,9 +8,6 @@ export interface Quote {
   address: string
   note: string | null
 }
-
-export const requestQuote = (args: { lat: number; lon: number; address: string; note?: string }) =>
-  callFunction<Quote>('delivery-quote', args)
 
 export const formatKm = (meters: number) => `${(meters / 1000).toFixed(1)} km`
 

@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Check, Copy, Gift, MessageCircle, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { supabase } from '../../lib/supabase'
+import { fetchReferralProgress } from '../../api/account'
+import { queryKeys } from '../../api/queryKeys'
 import { formatNaira } from '../../lib/format'
 import { STORE_NAME } from '../../config'
 import { useAuth } from '../../context/AuthContext'
@@ -25,12 +26,8 @@ export default function Invite() {
 
   // How many invited friends have a delivered order whose items came to at least the minimum.
   const { data: progress = 0 } = useQuery({
-    queryKey: ['referral-progress', user?.id],
-    queryFn: async (): Promise<number> => {
-      const { data, error } = await supabase.rpc('my_referral_progress')
-      if (error) throw error
-      return data as number
-    },
+    queryKey: queryKeys.account.referralProgress(user?.id),
+    queryFn: fetchReferralProgress,
     enabled: !!user,
   })
 

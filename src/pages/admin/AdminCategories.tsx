@@ -3,12 +3,18 @@ import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowLeft, ArrowUp, Check, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { supabase } from '../../lib/supabase'
+import {
+  addCategory,
+  deleteCategory,
+  fetchAdminCategories,
+  renameCategory,
+  setCategoryOrder,
+  type CategoryRow,
+} from '../../api/adminCatalog'
+import { errorMessage } from '../../api/db'
+import { invalidateAll, queryKeys } from '../../api/queryKeys'
 import { ListSkeleton } from '../../components/Skeleton'
 import ConfirmDialog from '../../components/admin/ConfirmDialog'
-import type { Category } from '../../lib/types'
-
-type CategoryRow = Category & { count: number }
 
 const inputClass =
   'w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand'
@@ -22,28 +28,16 @@ export default function AdminCategories() {
   const [deleting, setDeleting] = useState<CategoryRow | null>(null)
   const [moveTo, setMoveTo] = useState('')
 
-  const { data: categories, isLoading, error } = useQuery({
-    queryKey: ['admin-categories'],
-    queryFn: async (): Promise<CategoryRow[]> => {
-      const [cats, prods] = await Promise.all([
-        supabase.from('categories').select('*').order('sort_order'),
-        supabase.from('products').select('category_id'),
-      ])
-      if (cats.error) throw cats.error
-      if (prods.error) throw prods.error
-      const counts = new Map<string, number>()
-      for (const p of prods.data) counts.set(p.category_id, (counts.get(p.category_id) ?? 0) + 1)
-      return cats.data.map((c) => ({ ...c, count: counts.get(c.id) ?? 0 }))
-    },
-  })
+  const { data: categories, isLoading, error } = useQuery({ queryKey: queryKeys.admin.categories(), queryFn: fetchAdminCategories })
 
   // The storefront, footer and product form all share the 'categories' query.
   const refresh = () =>
-    Promise.all(
-      ['admin-categories', 'categories', 'admin-products', 'products'].map((k) =>
-        queryClient.invalidateQueries({ queryKey: [k] })
-      )
-    )
+    invalidateAll(queryClient, [
+      queryKeys.admin.categories(),
+      queryKeys.categories(),
+      queryKeys.admin.products(),
+      queryKeys.products.root(),
+    ])
 
   const nameTaken = (name: string, exceptId?: string) =>
     !!categories?.some((c) => c.id !== exceptId && c.name.trim().toLowerCase() === name.trim().toLowerCase())
@@ -54,9 +48,13 @@ export default function AdminCategories() {
     if (nameTaken(name)) return toast.error('You already have a category with that name.')
     setBusy(true)
     const nextOrder = (categories?.at(-1)?.sort_order ?? 0) + 1
-    const { error } = await supabase.from('categories').insert({ name, sort_order: nextOrder })
-    setBusy(false)
-    if (error) return toast.error(error.message)
+    try {
+      await addCategory(name, nextOrder)
+    } catch (err) {
+      return toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
     setNewName('')
     toast.success('Category added')
     refresh()
@@ -67,9 +65,13 @@ export default function AdminCategories() {
     if (!name) return toast.error('Enter a category name.')
     if (nameTaken(name, c.id)) return toast.error('You already have a category with that name.')
     setBusy(true)
-    const { error } = await supabase.from('categories').update({ name }).eq('id', c.id)
-    setBusy(false)
-    if (error) return toast.error(error.message)
+    try {
+      await renameCategory(c.id, name)
+    } catch (err) {
+      return toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
     setEditingId(null)
     toast.success('Category renamed')
     refresh()
@@ -82,13 +84,12 @@ export default function AdminCategories() {
     if (target < 0 || target >= next.length) return
     ;[next[index], next[target]] = [next[target], next[index]]
     setBusy(true)
-    // Rewrite sort_order as 0..n so the order is always clean, even if it had gaps or ties.
-    const results = await Promise.all(
-      next.map((c, i) => supabase.from('categories').update({ sort_order: i }).eq('id', c.id))
-    )
+    try {
+      await setCategoryOrder(next.map((c) => c.id))
+    } catch (err) {
+      toast.error(errorMessage(err))
+    }
     setBusy(false)
-    const failed = results.find((r) => r.error)
-    if (failed?.error) toast.error(failed.error.message)
     refresh()
   }
 
@@ -97,18 +98,13 @@ export default function AdminCategories() {
     if (deleting.count > 0 && !moveTo) return toast.error('Choose where to move its products.')
     setBusy(true)
     try {
-      if (deleting.count > 0) {
-        const { error } = await supabase.from('products').update({ category_id: moveTo }).eq('category_id', deleting.id)
-        if (error) throw error
-      }
-      const { error } = await supabase.from('categories').delete().eq('id', deleting.id)
-      if (error) throw error
+      await deleteCategory(deleting.id, deleting.count > 0 ? moveTo : null)
       toast.success('Category deleted')
       setDeleting(null)
       setMoveTo('')
       refresh()
     } catch (err) {
-      toast.error((err as Error).message)
+      toast.error(errorMessage(err))
     } finally {
       setBusy(false)
     }

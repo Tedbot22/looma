@@ -3,10 +3,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ImagePlus, Plus, Star, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { supabase } from '../../lib/supabase'
+import { createProduct, createVariant, removeVariantOrHide, updateProduct, updateVariant } from '../../api/adminCatalog'
+import { fetchCategories } from '../../api/catalog'
+import { invalidateAll, queryKeys } from '../../api/queryKeys'
 import { uploadProductImage } from '../../lib/images'
 import { PRODUCT_PHOTO_HINT } from '../../lib/layout'
-import type { Category, Product, ProductVariant } from '../../lib/types'
+import type { Product, ProductVariant } from '../../lib/types'
 
 interface Props {
   // Present when editing; absent when adding a new product.
@@ -94,14 +96,7 @@ export default function ProductForm({ initial }: Props) {
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const { data: categories } = useQuery({
-    queryKey: ['categories'],
-    queryFn: async (): Promise<Category[]> => {
-      const { data, error } = await supabase.from('categories').select('*').order('sort_order')
-      if (error) throw error
-      return data
-    },
-  })
+  const { data: categories } = useQuery({ queryKey: queryKeys.categories(), queryFn: fetchCategories })
 
   // ---------- photos ----------
   async function handleFiles(e: ChangeEvent<HTMLInputElement>) {
@@ -219,24 +214,13 @@ export default function ProductForm({ initial }: Props) {
       }
 
       if (productId) {
-        const { error } = await supabase.from('products').update(payload).eq('id', productId)
-        if (error) throw error
+        await updateProduct(productId, payload)
       } else {
-        const { data, error } = await supabase.from('products').insert(payload).select('id').single()
-        if (error) throw error
-        productId = data.id
+        productId = await createProduct(payload)
       }
 
       // Options removed in the form: delete them, or hide them if a past order uses them.
-      for (const id of deletedIds) {
-        const { error } = await supabase.from('product_variants').delete().eq('id', id)
-        // 23503 = it's part of a past order. We keep the history and simply hide the option.
-        if (error?.code === '23503') {
-          await supabase.from('product_variants').update({ is_active: false, stock: 0 }).eq('id', id)
-        } else if (error) {
-          throw error
-        }
-      }
+      for (const id of deletedIds) await removeVariantOrHide(id)
       setDeletedIds([])
 
       for (const group of groups) {
@@ -248,13 +232,8 @@ export default function ProductForm({ initial }: Props) {
             image: group.color.trim() ? group.image : null,
             is_active: true,
           }
-          if (row.id) {
-            const { error } = await supabase.from('product_variants').update(values).eq('id', row.id)
-            if (error) throw error
-          } else {
-            const { error } = await supabase.from('product_variants').insert({ ...values, product_id: productId })
-            if (error) throw error
-          }
+          if (row.id) await updateVariant(row.id, values)
+          else await createVariant(productId, values)
         }
       }
 
@@ -262,11 +241,12 @@ export default function ProductForm({ initial }: Props) {
       rememberDetails(details.trim())
 
       // Make the storefront and admin lists show fresh data.
-      await Promise.all(
-        ['admin-products', 'products', 'product', 'variant-info'].map((k) =>
-          queryClient.invalidateQueries({ queryKey: [k] })
-        )
-      )
+      await invalidateAll(queryClient, [
+        queryKeys.admin.products(),
+        queryKeys.products.root(),
+        queryKeys.product.root(),
+        queryKeys.variantInfo.root(),
+      ])
       toast.success(isNew ? 'Product added' : 'Product saved')
       navigate('/admin/products')
     } catch (err) {

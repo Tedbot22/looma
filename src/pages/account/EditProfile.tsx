@@ -2,7 +2,9 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { supabase } from '../../lib/supabase'
+import { classifyDeactivateError, deactivateMyAccount, updateProfile } from '../../api/account'
+import { errorMessage } from '../../api/db'
+import { queryKeys } from '../../api/queryKeys'
 import { useAuth } from '../../context/AuthContext'
 import { useProfile } from '../../hooks/useProfile'
 import AddressBook from '../../components/AddressBook'
@@ -39,17 +41,15 @@ export default function EditProfile() {
     }
 
     setSaving(true)
-    const { error } = await supabase
-      .from('profiles')
-      .update({ full_name: name.trim(), phone: phone.trim() })
-      .eq('id', user!.id)
-    setSaving(false)
-
-    if (error) {
-      toast.error(error.message)
+    try {
+      await updateProfile(user!.id, { name: name.trim(), phone: phone.trim() })
+    } catch (err) {
+      setSaving(false)
+      toast.error(errorMessage(err))
       return
     }
-    await queryClient.invalidateQueries({ queryKey: ['profile', user!.id] })
+    setSaving(false)
+    await queryClient.invalidateQueries({ queryKey: queryKeys.account.profile(user!.id) })
     setNameInput(null)
     setPhoneInput(null)
     toast.success('Profile saved')
@@ -66,13 +66,15 @@ export default function EditProfile() {
     if (!ok) return
 
     setDeactivating(true)
-    const { error } = await supabase.rpc('deactivate_my_account')
-    if (error) {
+    try {
+      await deactivateMyAccount()
+    } catch (err) {
       setDeactivating(false)
+      const problem = classifyDeactivateError(err)
       toast.error(
-        error.message.includes('ACTIVE_ORDERS')
+        problem === 'active_orders'
           ? "You have an order in progress. You can deactivate once it's delivered or cancelled."
-          : error.message.includes('ADMIN_ACCOUNT')
+          : problem === 'admin_account'
             ? "Store admin accounts can't be deactivated here."
             : "We couldn't deactivate your account. Please try again."
       )

@@ -1,18 +1,6 @@
-import { FunctionsHttpError } from '@supabase/supabase-js'
-import { supabase } from './supabase'
+// Payments, refunds and cancelling. All of it is decided by the server: nothing about money is sent from here.
 
-// Calls one of our payment functions and turns failures into readable messages.
-export async function callFunction<T>(name: string, body: object): Promise<T> {
-  const { data, error } = await supabase.functions.invoke(name, { body })
-  if (error) {
-    if (error instanceof FunctionsHttpError) {
-      const payload = await error.context.json().catch(() => null)
-      throw new Error(payload?.error ?? `Payment service error (${error.context.status}).`)
-    }
-    throw error
-  }
-  return data as T
-}
+import { callFunction } from './functions'
 
 // Asks the server to start a Paystack payment. Returns the Paystack page to send the customer to.
 // (The server decides the amount from the order, so nothing about money is sent from here.)

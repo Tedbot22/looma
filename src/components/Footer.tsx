@@ -2,7 +2,6 @@ import { useId, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, Clock, Mail, MapPin, MessageCircle, Phone } from 'lucide-react'
-import { supabase } from '../lib/supabase'
 import { STORE_NAME } from '../config'
 import { PAGE_WIDTH } from '../lib/layout'
 import { whatsappLink } from '../lib/whatsapp'
@@ -10,7 +9,8 @@ import { useAppSettings } from '../hooks/useAppSettings'
 import { FacebookIcon, InstagramIcon, TikTokIcon } from './SocialIcons'
 import Logo from '../components/Logo'
 import InstallApp from '../components/InstallApp'
-import type { Category } from '../lib/types'
+import { fetchCategories } from '../api/catalog'
+import { queryKeys } from '../api/queryKeys'
 
 const linkClass = 'text-sm text-gray-300 hover:text-white hover:underline'
 
@@ -64,14 +64,7 @@ export default function Footer() {
   const s = settings ?? {}
 
   // Same query as the shop's category chips, so this costs no extra request.
-  const { data: categories } = useQuery({
-    queryKey: ['categories'],
-    queryFn: async (): Promise<Category[]> => {
-      const { data, error } = await supabase.from('categories').select('*').order('sort_order')
-      if (error) throw error
-      return data
-    },
-  })
+  const { data: categories } = useQuery({ queryKey: queryKeys.categories(), queryFn: fetchCategories })
 
   // Only show a social link once the owner has filled it in (Admin, then Store).
   const socials = [

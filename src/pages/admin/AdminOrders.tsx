@@ -4,19 +4,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { MapPin, MessageCircle, Phone, Route } from 'lucide-react'
 import { toast } from 'sonner'
 import { useDialog } from '../../context/DialogContext'
-import { supabase } from '../../lib/supabase'
 import { formatNaira } from '../../lib/format'
 import { whatsappLinkTo } from '../../lib/whatsapp'
 import { formatKm, routeUrl } from '../../lib/delivery'
-import { cancelOrder } from '../../lib/payments'
+import { fetchAdminOrders, setOrderStatus, type AdminOrder } from '../../api/adminOrders'
+import { cancelOrder } from '../../api/payments'
+import { queryKeys } from '../../api/queryKeys'
 import type { OrderWithItems } from '../../lib/types'
 import AdminDeliveryPanel from '../../components/AdminDeliveryPanel'
-import { ACTIVE_STATUSES, type DeliveryAssignment } from '../../lib/adminDelivery'
-
-type AdminOrder = OrderWithItems & {
-  profiles: { full_name: string | null; phone: string | null } | null
-  delivery_assignments: DeliveryAssignment[]
-}
+import { ACTIVE_STATUSES } from '../../lib/adminDelivery'
 
 const TABS = [
   { key: 'placed', label: 'New' },
@@ -64,46 +60,17 @@ export default function AdminOrders() {
   const queryClient = useQueryClient()
 
   const { data: orders, isLoading, error } = useQuery({
-    queryKey: ['admin-orders', tab],
-    queryFn: async (): Promise<AdminOrder[]> => {
-      let query = supabase
-        .from('orders')
-        .select(
-          '*, order_items(*), profiles(full_name, phone), ' +
-            'delivery_assignments(id, order_id, rider_name, rider_phone, dispatch_company, status, expires_at, qr_verified_at, completed_at, closed_reason, created_at)'
-        )
-        .order('created_at', { ascending: false })
-        .limit(100)
-
-      if (tab !== 'all') query = query.eq('status', tab)
-
-      const { data, error } = await query
-      if (error) throw error
-      return data as unknown as AdminOrder[]
-    },
+    queryKey: queryKeys.admin.orders(tab),
+    queryFn: () => fetchAdminOrders(tab),
     refetchInterval: 15_000, // check for new orders every 15 seconds (push alerts come later)
   })
 
   const updateStatus = useMutation({
-    mutationFn: async ({
-      id,
-      status,
-      note,
-    }: {
-      id: string
-      status: 'confirmed' | 'out_for_delivery' | 'delivered'
-      note?: string
-    }) => {
-      const { error } = await supabase.rpc('set_order_status', {
-        p_order_id: id,
-        p_status: status,
-        p_note: note ?? null,
-      })
-      if (error) throw error
-    },
+    mutationFn: ({ id, status, note }: { id: string; status: 'confirmed' | 'out_for_delivery' | 'delivered'; note?: string }) =>
+      setOrderStatus(id, status, note),
     onSuccess: () => {
       toast.success('Order updated')
-      queryClient.invalidateQueries({ queryKey: ['admin-orders'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.ordersRoot() })
     },
     onError: (err) => toast.error(friendlyError((err as Error).message)),
   })
@@ -114,8 +81,8 @@ export default function AdminOrders() {
     onSuccess: (result) => {
       if (result.refund === 'failed') toast.warning(result.message)
       else toast.success(result.message)
-      queryClient.invalidateQueries({ queryKey: ['admin-orders'] })
-      queryClient.invalidateQueries({ queryKey: ['payment-issues'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.ordersRoot() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.paymentIssues() })
     },
     onError: (err) => toast.error((err as Error).message),
   })
@@ -278,7 +245,7 @@ export default function AdminOrders() {
                 orderNumber={order.order_number}
                 orderStatus={order.status}
                 assignments={order.delivery_assignments ?? []}
-                onChanged={() => queryClient.invalidateQueries({ queryKey: ['admin-orders'] })}
+                onChanged={() => queryClient.invalidateQueries({ queryKey: queryKeys.admin.ordersRoot() })}
               />
 
               <div className="mt-4 flex flex-wrap gap-2">

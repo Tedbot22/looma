@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { supabase } from '../../lib/supabase'
+import { errorMessage } from '../../api/db'
+import { fetchEditableSitePages, saveSitePage, type EditableSitePage } from '../../api/content'
+import { queryKeys } from '../../api/queryKeys'
+import { saveAppSettings } from '../../api/settings'
 import { useAppSettings } from '../../hooks/useAppSettings'
 import { ListSkeleton } from '../../components/Skeleton'
 
@@ -42,14 +45,17 @@ function StoreInfoForm() {
     }
 
     setSaving(true)
-    const rows = Object.entries(draft).map(([key, v]) => ({ key, value: v.trim() }))
-    const { error } = await supabase.from('app_settings').upsert(rows, { onConflict: 'key' })
+    try {
+      await saveAppSettings(Object.entries(draft).map(([key, v]) => ({ key, value: v.trim() })))
+    } catch (err) {
+      setSaving(false)
+      return toast.error(errorMessage(err))
+    }
     setSaving(false)
-    if (error) return toast.error(error.message)
 
     toast.success('Store details saved')
     setDraft({})
-    queryClient.invalidateQueries({ queryKey: ['app-settings'] })
+    queryClient.invalidateQueries({ queryKey: queryKeys.appSettings() })
   }
 
   return (
@@ -88,11 +94,7 @@ function StoreInfoForm() {
 // ---------------------------------------------------------------------------
 // The text of About, FAQ, Privacy Policy and Terms
 // ---------------------------------------------------------------------------
-interface SitePage {
-  slug: string
-  title: string
-  content: string
-}
+type SitePage = EditableSitePage
 
 const PAGE_ORDER = ['about', 'faq', 'privacy', 'terms']
 
@@ -108,16 +110,17 @@ function PageEditor({ page }: { page: SitePage }) {
   async function save() {
     if (!title.trim() || !content.trim()) return toast.error('A page needs a title and some text.')
     setSaving(true)
-    const { error } = await supabase
-      .from('site_pages')
-      .update({ title: title.trim(), content, updated_at: new Date().toISOString() })
-      .eq('slug', page.slug)
+    try {
+      await saveSitePage(page.slug, { title: title.trim(), content })
+    } catch (err) {
+      setSaving(false)
+      return toast.error(errorMessage(err))
+    }
     setSaving(false)
-    if (error) return toast.error(error.message)
 
     toast.success('Page saved')
-    queryClient.invalidateQueries({ queryKey: ['admin-site-pages'] })
-    queryClient.invalidateQueries({ queryKey: ['site-page', page.slug] })
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.sitePages() })
+    queryClient.invalidateQueries({ queryKey: queryKeys.sitePage(page.slug) })
   }
 
   return (
@@ -162,12 +165,8 @@ function PageEditor({ page }: { page: SitePage }) {
 
 export default function AdminStore() {
   const { data: pages, isLoading, error } = useQuery({
-    queryKey: ['admin-site-pages'],
-    queryFn: async (): Promise<SitePage[]> => {
-      const { data, error } = await supabase.from('site_pages').select('slug, title, content')
-      if (error) throw error
-      return (data as SitePage[]).sort((a, b) => PAGE_ORDER.indexOf(a.slug) - PAGE_ORDER.indexOf(b.slug))
-    },
+    queryKey: queryKeys.admin.sitePages(),
+    queryFn: async () => (await fetchEditableSitePages()).sort((a, b) => PAGE_ORDER.indexOf(a.slug) - PAGE_ORDER.indexOf(b.slug)),
   })
 
   return (

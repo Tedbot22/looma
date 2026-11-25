@@ -45,6 +45,7 @@ const AdminNotifications = lazy(() => import('./pages/admin/AdminNotifications')
 const ComingSoon = lazy(() => import('./pages/ComingSoon'))
 const RiderDelivery = lazy(() => import('./pages/RiderDelivery'))
 import ScrollToTop from './components/ScrollToTop'
+import ErrorBoundary from './components/ErrorBoundary'
 import RouteSeo from './components/RouteSeo'
 
 function PageFallback() {
@@ -62,6 +63,7 @@ export default function App() {
     <ScrollToTop />
     <RouteSeo />
       {/* Each page is its own chunk, downloaded the first time it is visited. */}
+      <ErrorBoundary variant="app">
       <Suspense fallback={<PageFallback />}>
       <Routes>
         {/* Admin area: its own layout, only for the owner */}
@@ -163,6 +165,7 @@ export default function App() {
         </Route>
       </Routes>
       </Suspense>
+      </ErrorBoundary>
     </BrowserRouter>
   )
 }
