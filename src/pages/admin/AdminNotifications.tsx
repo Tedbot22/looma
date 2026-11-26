@@ -1,35 +1,22 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, CalendarClock, Megaphone, Moon, Send } from 'lucide-react'
-import { FunctionsHttpError } from '@supabase/supabase-js'
 import { toast } from 'sonner'
-import { supabase } from '../../lib/supabase'
+import { errorMessage } from '../../api/db'
+import {
+  cancelPromo,
+  createPromo,
+  fetchPromos,
+  fetchPushActivity,
+  fetchPushSettings,
+  savePushSettings,
+  sendPromoNow,
+  type Promo,
+  type PushSettings,
+} from '../../api/push'
+import { queryKeys } from '../../api/queryKeys'
 import { STORE_NAME } from '../../config'
 import { useDialog } from '../../context/DialogContext'
-
-interface PushSettings {
-  cart_enabled: boolean
-  cart_first_hours: number
-  cart_second_hours: number
-  confirm_enabled: boolean
-  confirm_after_min: number
-  inactive_enabled: boolean
-  inactive_after_days: number
-  promo_weekly_cap: number
-  quiet_start_hour: number
-  quiet_end_hour: number
-}
-
-interface Promo {
-  id: string
-  title: string
-  body: string
-  url: string
-  scheduled_for: string
-  status: 'scheduled' | 'sending' | 'sent' | 'cancelled'
-  recipients: number | null
-  skipped_cap: number | null
-}
 
 const inputClass = 'w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand'
 const labelClass = 'mb-1 block text-xs font-medium text-gray-500'
@@ -115,25 +102,15 @@ function RulesPanel() {
   const [draft, setDraft] = useState<Partial<PushSettings>>({})
 
   const { data: saved, isLoading } = useQuery({
-    queryKey: ['push-settings'],
-    queryFn: async (): Promise<PushSettings> => {
-      const { data, error } = await supabase.from('push_settings').select('*').eq('id', 1).single()
-      if (error) throw error
-      return data as PushSettings
-    },
+    queryKey: queryKeys.admin.pushSettings(),
+    queryFn: fetchPushSettings,
   })
 
   const save = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from('push_settings')
-        .update({ ...draft, updated_at: new Date().toISOString() })
-        .eq('id', 1)
-      if (error) throw error
-    },
+    mutationFn: () => savePushSettings(draft),
     onSuccess: () => {
       setDraft({})
-      queryClient.invalidateQueries({ queryKey: ['push-settings'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.pushSettings() })
       toast.success('Notification settings saved')
     },
     onError: (err) => toast.error((err as Error).message),
@@ -273,25 +250,13 @@ function PromoPanel() {
   const [busy, setBusy] = useState(false)
 
   const { data: settings } = useQuery({
-    queryKey: ['push-settings'],
-    queryFn: async (): Promise<PushSettings> => {
-      const { data, error } = await supabase.from('push_settings').select('*').eq('id', 1).single()
-      if (error) throw error
-      return data as PushSettings
-    },
+    queryKey: queryKeys.admin.pushSettings(),
+    queryFn: fetchPushSettings,
   })
 
   const { data: promos } = useQuery({
-    queryKey: ['admin-promos'],
-    queryFn: async (): Promise<Promo[]> => {
-      const { data, error } = await supabase
-        .from('promo_messages')
-        .select('id, title, body, url, scheduled_for, status, recipients, skipped_cap')
-        .order('scheduled_for', { ascending: false })
-        .limit(20)
-      if (error) throw error
-      return data as Promo[]
-    },
+    queryKey: queryKeys.admin.promos(),
+    queryFn: fetchPromos,
     refetchInterval: 30_000,
   })
 
@@ -306,23 +271,12 @@ function PromoPanel() {
   const valid = title.trim().length > 0 && body.trim().length > 0
 
   async function create(scheduledFor: Date): Promise<string | null> {
-    const { data: auth } = await supabase.auth.getUser()
-    const { data, error } = await supabase
-      .from('promo_messages')
-      .insert({
-        title: title.trim(),
-        body: body.trim(),
-        url,
-        scheduled_for: scheduledFor.toISOString(),
-        created_by: auth.user?.id ?? null,
-      })
-      .select('id')
-      .single()
-    if (error) {
-      toast.error(error.message)
+    try {
+      return await createPromo({ title: title.trim(), body: body.trim(), url, scheduledFor })
+    } catch (err) {
+      toast.error(errorMessage(err))
       return null
     }
-    return data.id as string
   }
 
   function reset() {
@@ -330,7 +284,7 @@ function PromoPanel() {
     setBody('')
     setUrl('/')
     setWhen('')
-    queryClient.invalidateQueries({ queryKey: ['admin-promos'] })
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.promos() })
   }
 
   async function schedule() {
@@ -360,28 +314,19 @@ function PromoPanel() {
     if (!id) return setBusy(false)
 
     // Ask the scheduler to send exactly this promotion right away instead of waiting for its next 5-minute turn.
-    const { data, error } = await supabase.functions.invoke('push-scheduler', { body: { task: 'promos', promo_id: id } })
+    let report: Awaited<ReturnType<typeof sendPromoNow>> = null
+    let failure: string | null = null
+    try {
+      report = await sendPromoNow(id)
+    } catch (err) {
+      failure = errorMessage(err) // the server's own wording, e.g. "401: ..."
+    }
     setBusy(false)
 
-    if (error) {
-      // supabase-js only says "non-2xx status code". The real reason is in the response body.
-      let detail = error.message
-      if (error instanceof FunctionsHttpError) {
-        detail = `${error.context.status}: ${(await error.context.text().catch(() => '')) || 'no details'}`
-      }
-      toast.error(`Saved, but it didn't start sending: ${detail}. The timer will retry within 5 minutes.`)
+    if (failure !== null) {
+      toast.error(`Saved, but it didn't start sending: ${failure}. The timer will retry within 5 minutes.`)
     } else {
-      type Report = {
-        id: string
-        delivered?: number
-        failed?: number
-        noDevice?: number
-        audience?: number
-        skippedCap?: number
-        errors?: string[]
-        error?: string
-      }
-      const mine = (data?.promos as Report[] | undefined)?.find((p) => p.id === id)
+      const mine = report?.promos?.find((p) => p.id === id)
       if (!mine) {
         toast.info('Saved. It will go out on the next timer run (within 5 minutes).')
       } else if (mine.error) {
@@ -410,9 +355,12 @@ function PromoPanel() {
       danger: true,
     })
     if (!ok) return
-    const { error } = await supabase.from('promo_messages').update({ status: 'cancelled' }).eq('id', promo.id).eq('status', 'scheduled')
-    if (error) return toast.error(error.message)
-    queryClient.invalidateQueries({ queryKey: ['admin-promos'] })
+    try {
+      await cancelPromo(promo.id)
+    } catch (err) {
+      return toast.error(errorMessage(err))
+    }
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.promos() })
     toast.success('Promotion cancelled')
   }
 
@@ -546,14 +494,8 @@ function PromoPanel() {
 // ---------------------------------------------------------------------------
 function ActivityPanel() {
   const { data } = useQuery({
-    queryKey: ['push-activity'],
-    queryFn: async () => {
-      const since = new Date(Date.now() - 7 * 86_400_000).toISOString()
-      const { data, error } = await supabase.from('push_log').select('kind').gte('sent_at', since).limit(10000)
-      if (error) throw error
-      const count = (kinds: string[]) => (data ?? []).filter((r) => kinds.includes(r.kind)).length
-      return { cart: count(['cart_1', 'cart_2']), promo: count(['promo']), inactive: count(['inactive']) }
-    },
+    queryKey: queryKeys.admin.pushActivity(),
+    queryFn: fetchPushActivity,
   })
 
   const tiles = [

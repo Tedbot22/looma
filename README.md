@@ -36,11 +36,17 @@ Every push and pull request on GitHub runs lint, the tests and the build (see `.
 | --- | --- |
 | `src/pages` | One file per page (shop, product, checkout, admin pages...) |
 | `src/components` | Pieces shared between pages (cards, header, dialogs, error screens) |
-| `src/api` | The only place that talks to the database about products. New data access goes here, not in pages. |
+| `src/api` | The only place that talks to the database, the payment and delivery server functions, and file storage. One file per area (catalogue, orders, cart, reviews...). Screens call these functions; they never build queries themselves. A test fails if a file outside `src/api` does. |
 | `src/hooks`, `src/context` | Shared behaviour: cart, wishlist, login, search suggestions |
 | `src/lib` | Plain logic with no screen: search ranking, coupons, deal ordering, formatting. Most tests are here. |
 | `supabase/migrations` | The database, as numbered SQL files. Run them in order. Every database change belongs here. |
 | `supabase/functions` | Edge functions: payments, refunds, notifications, support chat, the push scheduler |
+
+## Adding or changing data access
+
+1. Put the query in the right file in `src/api` (or add a new one), as a small function with a clear name.
+2. Add its cache key to `src/api/queryKeys.ts`, so every screen shares one spelling of it.
+3. Add a test next to it: `src/test/fakeSupabase.ts` records the table, columns and filters a function uses, so a typo in a query fails a test instead of the live store.
 
 ## Changing the database
 

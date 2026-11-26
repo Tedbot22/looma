@@ -22,6 +22,7 @@ export function fakeSupabase() {
   const calls: RecordedCall[] = []
   let respond: Responder = () => ({ data: [] })
   let storageFails = false
+  let uploadFails = false
   let invoke: (name: string, options: { body?: unknown }) => Promise<{ data: unknown; error: unknown }> = async () => ({
     data: null,
     error: null,
@@ -72,6 +73,11 @@ export function fakeSupabase() {
           record('storage', bucket, [['remove', [paths]]])
           return storageFails ? Promise.reject(new Error('storage is down')) : Promise.resolve({ error: null })
         },
+        upload: (path: string, body: unknown, options: unknown) => {
+          record('storage', bucket, [['upload', [path, (body as { type?: string })?.type ?? typeof body, options]]])
+          return Promise.resolve({ error: uploadFails ? { message: 'upload refused' } : null })
+        },
+        getPublicUrl: (path: string) => ({ data: { publicUrl: `https://files.test/${bucket}/${path}` } }),
       }),
     },
   }
@@ -88,10 +94,14 @@ export function fakeSupabase() {
     failStorage: () => {
       storageFails = true
     },
+    failUploads: () => {
+      uploadFails = true
+    },
     reset: () => {
       calls.length = 0
       respond = () => ({ data: [] })
       storageFails = false
+      uploadFails = false
       invoke = async () => ({ data: null, error: null })
     },
   }

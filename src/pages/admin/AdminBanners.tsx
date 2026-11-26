@@ -14,7 +14,7 @@ import {
 import { errorMessage } from '../../api/db'
 import { invalidateAll, queryKeys } from '../../api/queryKeys'
 import type { BannerRow } from '../../lib/types'
-import { uploadProductImage } from '../../lib/images'
+import { uploadProductImage } from '../../api/storage'
 import { BANNER_SIZE_HINT } from '../../lib/layout'
 import { ListSkeleton } from '../../components/Skeleton'
 

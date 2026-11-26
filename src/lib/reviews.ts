@@ -132,3 +132,11 @@ export function dismissOrderPrompt(orderId: string): string[] {
   }
   return next
 }
+
+export type ReviewSort = 'newest' | 'highest' | 'lowest'
+
+export interface ReviewFilters {
+  rating: number | null // only this many stars, or null for all
+  withComments: boolean
+  sort: ReviewSort
+}

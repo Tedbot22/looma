@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { createProduct, createVariant, removeVariantOrHide, updateProduct, updateVariant } from '../../api/adminCatalog'
 import { fetchCategories } from '../../api/catalog'
 import { invalidateAll, queryKeys } from '../../api/queryKeys'
-import { uploadProductImage } from '../../lib/images'
+import { uploadProductImage } from '../../api/storage'
 import { PRODUCT_PHOTO_HINT } from '../../lib/layout'
 import type { Product, ProductVariant } from '../../lib/types'
 

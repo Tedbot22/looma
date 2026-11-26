@@ -1,5 +1,4 @@
 // Helpers for browser push notifications.
-import { supabase } from './supabase'
 
 export const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined
 
@@ -69,20 +68,5 @@ export function setOptedOut(userId: string, off: boolean): void {
     else localStorage.removeItem(optOutKey(userId))
   } catch {
     /* storage blocked: nothing to remember */
-  }
-}
-
-// Called when someone logs out: stop sending THEIR order updates to this device, so the next
-// person using a shared phone or computer doesn't see them. (The browser's permission stays.)
-export async function detachThisDevice(): Promise<void> {
-  try {
-    if (!isPushSupported()) return
-    const registration = await readyRegistration(1500)
-    const subscription = await registration?.pushManager.getSubscription()
-    if (subscription) {
-      await supabase.from('customer_push_subscriptions').delete().eq('endpoint', subscription.endpoint)
-    }
-  } catch {
-    /* logging out must never fail because of notifications */
   }
 }

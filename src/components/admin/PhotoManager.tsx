@@ -1,7 +1,7 @@
 import { useRef, useState, type ChangeEvent } from 'react'
 import { ImagePlus, Star, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { uploadProductImage } from '../../lib/images'
+import { uploadProductImage } from '../../api/storage'
 
 interface Props {
   images: string[]

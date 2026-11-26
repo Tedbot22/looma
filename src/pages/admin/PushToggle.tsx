@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Bell, BellOff } from 'lucide-react'
-import { FunctionsHttpError } from '@supabase/supabase-js'
 import { toast } from 'sonner'
-import { supabase } from '../../lib/supabase'
+import {
+  isDeviceSavedForCustomer,
+  removeOwnerDevice,
+  saveOwnerDevice,
+  sendTestAlert,
+} from '../../api/push'
 import { useAuth } from '../../context/AuthContext'
 import {
   VAPID_PUBLIC_KEY,
@@ -41,10 +45,7 @@ export default function PushToggle() {
     const registration = await readyRegistration()
     if (!registration) throw new Error('The app is still loading. Try again in a moment.')
     const subscription = await getOrCreateSubscription(registration, fresh)
-    const { error } = await supabase
-      .from('device_tokens')
-      .upsert({ user_id: user.id, token: JSON.stringify(subscription), platform: 'web' }, { onConflict: 'token' })
-    if (error) throw error
+    await saveOwnerDevice(user.id, subscription)
   }
 
   async function enable() {
@@ -74,23 +75,10 @@ export default function PushToggle() {
       const subscription = await registration?.pushManager.getSubscription()
       if (subscription && user) {
         // Remove this device's rows by its address (more reliable than matching the whole saved text).
-        const { data: rows } = await supabase.from('device_tokens').select('id, token').eq('user_id', user.id)
-        const mine = (rows ?? []).filter((r) => {
-          try {
-            return JSON.parse(r.token).endpoint === subscription.endpoint
-          } catch {
-            return false
-          }
-        })
-        if (mine.length > 0) await supabase.from('device_tokens').delete().in('id', mine.map((r) => r.id))
+        await removeOwnerDevice(user.id, subscription.endpoint)
 
         // The same browser subscription also carries this person's customer order updates: keep it if so.
-        const { data: asCustomer } = await supabase
-          .from('customer_push_subscriptions')
-          .select('id')
-          .eq('endpoint', subscription.endpoint)
-          .maybeSingle()
-        if (!asCustomer) await subscription.unsubscribe()
+        if (!(await isDeviceSavedForCustomer(subscription.endpoint))) await subscription.unsubscribe()
       }
       setState('off')
       toast.success('Order alerts are off for this device')
@@ -101,18 +89,7 @@ export default function PushToggle() {
     }
   }
 
-  async function invokeTest() {
-    const { data, error } = await supabase.functions.invoke('notify-order', { body: { test: true } })
-    if (error) {
-      // supabase-js only says "non-2xx status code". The useful part is in the response body.
-      if (error instanceof FunctionsHttpError) {
-        const body = await error.context.text().catch(() => '')
-        throw new Error(`${error.context.status}: ${body || 'no details'}`)
-      }
-      throw error
-    }
-    return data as { sent?: number; registered?: number; errors?: string[] } | null
-  }
+  const invokeTest = sendTestAlert
 
   async function sendTest() {
     setBusy(true)

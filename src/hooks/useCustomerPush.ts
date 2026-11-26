@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { supabase } from '../lib/supabase'
+import { isDeviceSavedForCustomer, registerCustomerSubscription, removeCustomerSubscription } from '../api/push'
 import { useAuth } from '../context/AuthContext'
 import { useProfile } from './useProfile'
 import {
@@ -42,12 +42,7 @@ export function useCustomerPush() {
     if (!subscriptionMatchesKey(subscription)) return setState('off')
 
     // "On" means THIS device is saved under THIS account on the server.
-    const { data } = await supabase
-      .from('customer_push_subscriptions')
-      .select('id')
-      .eq('endpoint', subscription.endpoint)
-      .maybeSingle()
-    setState(data ? 'on' : 'off')
+    setState((await isDeviceSavedForCustomer(subscription.endpoint)) ? 'on' : 'off')
   }, [user])
 
   useEffect(() => {
@@ -72,8 +67,7 @@ export function useCustomerPush() {
       const subscription = await getOrCreateSubscription(registration)
 
       // 3. Save it under this customer. The database function sets the owner from the login.
-      const { error } = await supabase.rpc('register_push_subscription', { p_subscription: subscription.toJSON() })
-      if (error) throw error
+      await registerCustomerSubscription(subscription.toJSON())
 
       setOptedOut(user.id, false)
       setState('on')
@@ -93,7 +87,7 @@ export function useCustomerPush() {
       const registration = await readyRegistration()
       const subscription = await registration?.pushManager.getSubscription()
       if (subscription) {
-        await supabase.from('customer_push_subscriptions').delete().eq('endpoint', subscription.endpoint)
+        await removeCustomerSubscription(subscription.endpoint)
         // The owner's order alerts use the same browser subscription, so only fully remove it for customers.
         if (!profile?.is_admin) await subscription.unsubscribe()
       }

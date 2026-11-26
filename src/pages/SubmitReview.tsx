@@ -3,21 +3,16 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { supabase } from '../lib/supabase'
+import { queryKeys, invalidateAll } from '../api/queryKeys'
+import { attachReviewMedia, classifyReviewError, createReview, fetchOrderToReview } from '../api/reviews'
+import { removeUploadedReviewMedia, uploadReviewMedia } from '../api/storage'
 import { useAuth } from '../context/AuthContext'
 import { useOrderReview } from '../hooks/useReviews'
 import { StarPicker } from '../components/StarRating'
 import ReviewMediaPicker from '../components/ReviewMediaPicker'
-import { removeUploaded, uploadReviewMedia, type PendingMedia } from '../lib/reviewMedia'
+import type { PendingMedia } from '../lib/reviewMedia'
 import { OrderSkeleton } from '../components/Skeleton'
 import { MAX_MESSAGE_LENGTH, REVIEW_QUESTIONS, type ReviewQuestionKey } from '../lib/reviews'
-
-interface OrderToReview {
-  id: string
-  order_number: number
-  status: string
-  order_items: { name: string }[]
-}
 
 // Where the customer lands after tapping a star. The star is already filled in; the quick questions
 // and the message are all optional, so leaving a review never feels like paperwork.
@@ -40,18 +35,9 @@ export default function SubmitReview() {
   const [done, setDone] = useState(false)
 
   const { data: order, isLoading } = useQuery({
-    queryKey: ['order-to-review', orderId],
+    queryKey: queryKeys.reviews.orderToReview(orderId),
     enabled: !!orderId,
-    queryFn: async (): Promise<OrderToReview | null> => {
-      // RLS guarantees you can only read your own orders.
-      const { data, error } = await supabase
-        .from('orders')
-        .select('id, order_number, status, order_items(name)')
-        .eq('id', orderId!)
-        .maybeSingle()
-      if (error) throw error
-      return data as OrderToReview | null
-    },
+    queryFn: () => fetchOrderToReview(orderId!), // the database only lets you read your own orders
   })
   const { data: existing, isLoading: checkingExisting } = useOrderReview(orderId)
 
@@ -115,7 +101,7 @@ export default function SubmitReview() {
         uploaded.push({ kind: item.kind, url: await uploadReviewMedia(user.id, item) })
       }
     } catch {
-      await removeUploaded(uploaded.map((u) => u.url))
+      await removeUploadedReviewMedia(uploaded.map((u) => u.url))
       setSubmitting(false)
       setProgress('')
       toast.error("We couldn't upload your photos or video. Check your connection and try again.")
@@ -124,26 +110,24 @@ export default function SubmitReview() {
     setProgress('')
 
     // 2. The review itself.
-    const { data: created, error } = await supabase
-      .from('store_reviews')
-      .insert({
-        order_id: order.id,
-        user_id: user.id,
+    let reviewId: string
+    try {
+      reviewId = await createReview({
+        orderId: order.id,
+        userId: user.id,
         rating,
-        item_condition: answers.item_condition ?? null,
+        itemCondition: answers.item_condition ?? null,
         delivery: answers.delivery ?? null,
         message: message.trim() || null,
       })
-      .select('id')
-      .single()
-
-    if (error || !created) {
-      await removeUploaded(uploaded.map((u) => u.url))
+    } catch (err) {
+      await removeUploadedReviewMedia(uploaded.map((u) => u.url))
       setSubmitting(false)
+      const problem = classifyReviewError(err)
       toast.error(
-        error?.code === '23505'
+        problem === 'already_reviewed'
           ? "You've already reviewed this order."
-          : error?.code === '42501'
+          : problem === 'not_delivered'
             ? 'Reviews open once your order has been delivered.'
             : "We couldn't send your review. Please try again."
       )
@@ -152,11 +136,10 @@ export default function SubmitReview() {
 
     // 3. Attach the files to the review.
     if (uploaded.length > 0) {
-      const { error: mediaError } = await supabase
-        .from('review_media')
-        .insert(uploaded.map((u) => ({ review_id: created.id, user_id: user.id, kind: u.kind, url: u.url })))
-      if (mediaError) {
-        await removeUploaded(uploaded.map((u) => u.url))
+      try {
+        await attachReviewMedia(reviewId, user.id, uploaded)
+      } catch {
+        await removeUploadedReviewMedia(uploaded.map((u) => u.url))
         toast.warning("Your review was sent, but your photos or video couldn't be attached.")
       }
     }
@@ -164,9 +147,7 @@ export default function SubmitReview() {
     media.forEach((m) => URL.revokeObjectURL(m.preview))
 
     // Refresh everything that shows reviews, so the new one appears and the prompt goes away.
-    for (const key of ['review-stats', 'store-reviews', 'product-reviews', 'review-products', 'my-reviewed-orders', 'my-review', 'admin-reviews', 'review-media']) {
-      queryClient.invalidateQueries({ queryKey: [key] })
-    }
+    void invalidateAll(queryClient, [...queryKeys.reviews.allShown()])
     setDone(true)
   }
 

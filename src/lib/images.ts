@@ -1,5 +1,3 @@
-import { supabase } from './supabase'
-
 // Phone photos are often 3 to 8 MB. Shrinking them BEFORE upload means faster uploads for the
 // owner, and much faster pages (and less mobile data) for students browsing the store.
 export async function resizeImage(file: File, maxSize = 1200, quality = 0.82): Promise<Blob> {
@@ -19,18 +17,4 @@ export async function resizeImage(file: File, maxSize = 1200, quality = 0.82): P
       quality
     )
   )
-}
-
-// Uploads one photo and returns its public URL.
-// maxSize is the longest side in pixels: product photos use 1200, wide banners use more.
-export async function uploadProductImage(file: File, maxSize = 1200): Promise<string> {
-  const blob = await resizeImage(file, maxSize)
-  const path = `${crypto.randomUUID()}.jpg` // random name: no clashes, no guessable URLs
-
-  const { error } = await supabase.storage
-    .from('product-images')
-    .upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' })
-  if (error) throw error
-
-  return supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl
 }

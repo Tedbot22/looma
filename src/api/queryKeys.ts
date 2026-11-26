@@ -46,6 +46,31 @@ export const queryKeys = {
     coupons: (userId: string | undefined) => ['coupons', userId] as const,
     couponsRoot: () => ['coupons'] as const,
     referralProgress: (userId: string | undefined) => ['referral-progress', userId] as const,
+    marketingPref: (userId: string | undefined) => ['push-marketing', userId] as const,
+  },
+
+  reviews: {
+    stats: () => ['review-stats'] as const,
+    store: (filters: unknown) => ['store-reviews', filters] as const,
+    product: (productId: string | undefined) => ['product-reviews', productId] as const,
+    products: (reviewIds: string[]) => ['review-products', reviewIds.join(',')] as const,
+    media: (reviewIds: string[]) => ['review-media', reviewIds.join(',')] as const,
+    reviewedOrders: (userId: string | undefined) => ['my-reviewed-orders', userId] as const,
+    promptOrders: (userId: string | undefined) => ['review-prompt-orders', userId] as const,
+    orderReview: (orderId: string | undefined) => ['my-review', orderId] as const,
+    orderToReview: (orderId: string | undefined) => ['order-to-review', orderId] as const,
+    // Everything that shows reviews, so one new review (or one hidden review) appears everywhere.
+    allShown: () =>
+      [
+        ['review-stats'],
+        ['store-reviews'],
+        ['product-reviews'],
+        ['review-products'],
+        ['review-media'],
+        ['my-reviewed-orders'],
+        ['my-review'],
+        ['admin-reviews'],
+      ] as const,
   },
 
   cart: {
@@ -78,6 +103,13 @@ export const queryKeys = {
     paymentIssues: () => ['payment-issues'] as const,
     deliveryEvents: (orderId: string) => ['delivery-events', orderId] as const,
     zones: () => ['admin-zones'] as const,
+    reviews: () => ['admin-reviews'] as const,
+    support: (status: string) => ['admin-support', status] as const,
+    supportRoot: () => ['admin-support'] as const,
+    supportMessages: (chatId: string) => ['admin-support-messages', chatId] as const,
+    pushSettings: () => ['push-settings'] as const,
+    promos: () => ['admin-promos'] as const,
+    pushActivity: () => ['push-activity'] as const,
     sitePages: () => ['admin-site-pages'] as const,
     templates: () => ['admin-templates'] as const,
     referrals: (userId: string) => ['admin-referrals', userId] as const,

@@ -2,22 +2,14 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, ChevronDown, MessageCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { supabase } from '../../lib/supabase'
+import { errorMessage } from '../../api/db'
+import { fetchSupportChats, fetchSupportMessages, resolveSupportChat, type SupportChat } from '../../api/support'
 import { STORE_NAME } from '../../config'
-import { whatsappDigits, type SupportMessage } from '../../lib/support'
+import { whatsappDigits } from '../../lib/support'
 import { ListSkeleton } from '../../components/Skeleton'
 import { queryKeys } from '../../api/queryKeys'
 
-interface Chat {
-  id: string
-  status: 'ai' | 'escalated' | 'resolved'
-  summary: string | null
-  escalation_reason: string | null
-  escalated_at: string | null
-  last_message_at: string
-  orders: { order_number: number } | null
-  profiles: { full_name: string | null; phone: string | null } | null
-}
+type Chat = SupportChat
 
 type Filter = 'escalated' | 'resolved'
 
@@ -31,30 +23,22 @@ export default function AdminSupport() {
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const { data: chats, isLoading, error } = useQuery({
-    queryKey: ['admin-support', filter],
-    queryFn: async (): Promise<Chat[]> => {
-      const { data, error } = await supabase
-        .from('support_conversations')
-        .select('id, status, summary, escalation_reason, escalated_at, last_message_at, orders(order_number), profiles(full_name, phone)')
-        .eq('status', filter)
-        .order('last_message_at', { ascending: false })
-        .limit(100)
-      if (error) throw error
-      return data as unknown as Chat[]
-    },
+    queryKey: queryKeys.admin.support(filter),
+    queryFn: () => fetchSupportChats(filter),
     refetchInterval: 30_000,
   })
 
   async function resolve(chat: Chat) {
     setBusyId(chat.id)
-    const { error } = await supabase
-      .from('support_conversations')
-      .update({ status: 'resolved', resolved_at: new Date().toISOString() })
-      .eq('id', chat.id)
+    try {
+      await resolveSupportChat(chat.id)
+    } catch (err) {
+      setBusyId(null)
+      return toast.error(errorMessage(err))
+    }
     setBusyId(null)
-    if (error) return toast.error(error.message)
     toast.success('Marked as resolved')
-    queryClient.invalidateQueries({ queryKey: ['admin-support'] })
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.supportRoot() })
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.counts.support() })
   }
 
@@ -150,17 +134,8 @@ export default function AdminSupport() {
 
 function Transcript({ chatId, name }: { chatId: string; name: string }) {
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-support-messages', chatId],
-    queryFn: async (): Promise<SupportMessage[]> => {
-      const { data, error } = await supabase
-        .from('support_messages')
-        .select('id, role, content, created_at')
-        .eq('conversation_id', chatId)
-        .order('created_at', { ascending: true })
-        .limit(300)
-      if (error) throw error
-      return data as SupportMessage[]
-    },
+    queryKey: queryKeys.admin.supportMessages(chatId),
+    queryFn: () => fetchSupportMessages(chatId),
   })
   if (isLoading) return <p className="mt-2 text-xs text-gray-400">Loading…</p>
   return (

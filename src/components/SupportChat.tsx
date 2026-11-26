@@ -5,14 +5,8 @@ import { toast } from 'sonner'
 import { useAuth } from '../context/AuthContext'
 import { STORE_NAME } from '../config'
 import LoomaLogo from './LoomaLogo'
-import {
-  MAX_SUPPORT_MESSAGE,
-  escalateSupportChat,
-  openSupportChat,
-  sendSupportMessage,
-  type SupportMessage,
-  type SupportSnapshot,
-} from '../lib/support'
+import { escalateSupportChat, openSupportChat, sendSupportMessage } from '../api/support'
+import { MAX_SUPPORT_MESSAGE, type SupportMessage, type SupportSnapshot } from '../lib/support'
 
 const GREETING = `Hi! I'm ${STORE_NAME}'s virtual assistant. I can check an order for you or answer questions about delivery and the store. For anything else I'll bring in an Agent.`
 

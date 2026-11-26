@@ -1,8 +1,5 @@
-import { supabase } from './supabase'
-
-// Everything the rider's page asks the database. The rider has no account: the secret
-// link token is the credential, and the DATABASE decides whether each action is allowed.
-// These functions never invent a success; they only pass on what the server said.
+// What the rider's page shows: the shapes the server sends back, and the plain-language wording for every
+// code. (The calls themselves are in src/api/rider.ts.)
 
 export type RiderStatus = 'assigned' | 'out_for_delivery' | 'qr_verified'
 
@@ -35,43 +32,12 @@ export interface Reply {
   [key: string]: unknown
 }
 
-async function call(fn: string, args: Record<string, unknown>): Promise<Reply> {
-  try {
-    const { data, error } = await supabase.rpc(fn, args)
-    if (error || !data || typeof data !== 'object') return { ok: false, code: 'NETWORK' }
-    const reply = data as Record<string, unknown>
-    return { ...reply, ok: reply.ok === true, code: String(reply.code ?? (reply.ok ? 'OK' : 'ERROR')) }
-  } catch {
-    return { ok: false, code: 'NETWORK' }
-  }
-}
-
 export type FailReason =
   | 'customer_unavailable'
   | 'customer_unreachable'
   | 'wrong_address'
   | 'customer_refused'
   | 'other'
-
-export const getDelivery = (token: string) => call('rider_get_delivery', { p_token: token })
-export const startDelivery = (token: string) => call('rider_start_delivery', { p_token: token })
-export const verifyQr = (token: string, qr: string) => call('rider_verify_qr', { p_token: token, p_qr: qr })
-// Asks the server to TEXT a 6-digit code to the customer's phone. The code never comes back here.
-export async function requestOtpSms(token: string): Promise<Reply> {
-  try {
-    const { data, error } = await supabase.functions.invoke('send-delivery-otp', { body: { token } })
-    if (error || !data || typeof data !== 'object') return { ok: false, code: 'NETWORK' }
-    const reply = data as Record<string, unknown>
-    return { ...reply, ok: reply.ok === true, code: String(reply.code ?? 'ERROR') }
-  } catch {
-    return { ok: false, code: 'NETWORK' }
-  }
-}
-
-export const verifyOtp = (token: string, code: string) => call('rider_verify_otp', { p_token: token, p_code: code })
-export const completeDelivery = (token: string) => call('rider_complete_delivery', { p_token: token })
-export const reportFailed = (token: string, reason: FailReason, note: string) =>
-  call('rider_report_failed', { p_token: token, p_reason: reason, p_note: note || null })
 
 export const FAIL_REASONS: { value: FailReason; label: string }[] = [
   { value: 'customer_unavailable', label: 'Customer is not at the location' },
@@ -207,8 +173,6 @@ export const MESSAGES: Record<string, { title: string; text: string }> = {
 export const messageFor = (code: string) => MESSAGES[code] ?? MESSAGES.ERROR
 
 // ---------- Pay by transfer (pay-on-delivery orders) ----------
-// The rider asks for a temporary bank account tied to this order. The customer transfers the exact
-// total to it; the server confirms with Paystack. This page never decides whether money arrived.
 export interface TransferAccount {
   account_number: string
   account_name: string | null
@@ -216,17 +180,3 @@ export interface TransferAccount {
   amount: number
   expires_at: string
 }
-
-async function transferCall(token: string, action: 'status' | 'create'): Promise<Reply> {
-  try {
-    const { data, error } = await supabase.functions.invoke('rider-payment-account', { body: { token, action } })
-    if (error || !data || typeof data !== 'object') return { ok: false, code: 'NETWORK' }
-    const reply = data as Record<string, unknown>
-    return { ...reply, ok: reply.ok === true, code: String(reply.code ?? 'ERROR') }
-  } catch {
-    return { ok: false, code: 'NETWORK' }
-  }
-}
-
-export const getTransferState = (token: string) => transferCall(token, 'status')
-export const createTransferAccount = (token: string) => transferCall(token, 'create')

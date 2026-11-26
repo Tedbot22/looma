@@ -2,27 +2,13 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Eye, EyeOff } from 'lucide-react'
 import { toast } from 'sonner'
-import { supabase } from '../../lib/supabase'
+import { errorMessage } from '../../api/db'
+import { invalidateAll, queryKeys } from '../../api/queryKeys'
+import { fetchAdminReviews, setReviewVisible, type AdminReview } from '../../api/reviews'
 import { Stars } from '../../components/StarRating'
 import { ListSkeleton } from '../../components/Skeleton'
 import { REVIEW_QUESTIONS, optionLabel, type ReviewQuestionKey } from '../../lib/reviews'
 import ReviewMediaGallery from '../../components/ReviewMediaGallery'
-import type { ReviewMedia } from '../../lib/reviewMedia'
-
-interface AdminReview {
-  id: string
-  rating: number
-  size_fit: string | null
-  comfort: string | null
-  delivery: string | null
-  item_condition: string | null
-  message: string | null
-  is_visible: boolean
-  created_at: string
-  orders: { order_number: number } | null
-  profiles: { full_name: string | null } | null
-  review_media: Pick<ReviewMedia, 'id' | 'kind' | 'url'>[] | null
-}
 
 type Filter = 'all' | 'low' | 'hidden'
 
@@ -34,28 +20,22 @@ export default function AdminReviews() {
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const { data: reviews, isLoading, error } = useQuery({
-    queryKey: ['admin-reviews'],
-    queryFn: async (): Promise<AdminReview[]> => {
-      const { data, error } = await supabase
-        .from('store_reviews')
-        .select('*, orders(order_number), profiles(full_name), review_media(id, kind, url)')
-        .order('created_at', { ascending: false })
-        .limit(200)
-      if (error) throw error
-      return data as unknown as AdminReview[]
-    },
+    queryKey: queryKeys.admin.reviews(),
+    queryFn: fetchAdminReviews,
   })
 
   async function setVisible(review: AdminReview, visible: boolean) {
     setBusyId(review.id)
-    const { error } = await supabase.from('store_reviews').update({ is_visible: visible }).eq('id', review.id)
+    try {
+      await setReviewVisible(review.id, visible)
+    } catch (err) {
+      setBusyId(null)
+      return toast.error(errorMessage(err))
+    }
     setBusyId(null)
-    if (error) return toast.error(error.message)
 
     toast.success(visible ? 'Review is public again' : 'Review hidden from the store')
-    for (const key of ['admin-reviews', 'review-stats', 'store-reviews']) {
-      queryClient.invalidateQueries({ queryKey: [key] })
-    }
+    void invalidateAll(queryClient, [queryKeys.admin.reviews(), queryKeys.reviews.stats(), ['store-reviews']])
   }
 
   const all = reviews ?? []

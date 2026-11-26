@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CheckCircle2, Copy, Landmark } from 'lucide-react'
 import { formatNaira } from '../lib/format'
-import { createTransferAccount, getTransferState, type TransferAccount } from '../lib/rider'
+import { createTransferAccount, getTransferState } from '../api/rider'
+import type { TransferAccount } from '../lib/rider'
 
 // Pay-on-delivery customers pay ONLY by transfer: the rider generates a temporary bank account for this
 // delivery. No cash is accepted. The server (not this page) confirms the money arrived with Paystack.

@@ -9,10 +9,8 @@ import { Skeleton } from '../components/Skeleton'
 import { formatNaira } from '../lib/format'
 import { whatsappLink } from '../lib/whatsapp'
 import { STORE_NAME } from '../config'
-import {
-  DEAD_LINK_CODES, FAIL_REASONS, completeDelivery, getDelivery, messageFor, reportFailed, requestOtpSms, startDelivery, verifyOtp, verifyQr,
-  type FailReason, type Reply, type RiderDelivery,
-} from '../lib/rider'
+import { completeDelivery, getDelivery, reportFailed, requestOtpSms, startDelivery, verifyOtp, verifyQr } from '../api/rider'
+import { DEAD_LINK_CODES, FAIL_REASONS, messageFor, type FailReason, type Reply, type RiderDelivery } from '../lib/rider'
 
 // The rider's page. No login: the secret link is the credential.
 // It shows "delivered" ONLY after the server replies that the delivery was completed.
