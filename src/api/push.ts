@@ -3,7 +3,7 @@
 
 import { supabase } from '../lib/supabase'
 import { isPushSupported, readyRegistration } from '../lib/push'
-import { run, unwrap } from './db'
+import { errorCode, errorMessage, run, unwrap } from './db'
 import { callFunctionWithDetails } from './functions'
 
 /* ---------------------------- a customer's device ---------------------------- */
@@ -101,6 +101,7 @@ export interface PushSettings {
   promo_weekly_cap: number
   quiet_start_hour: number
   quiet_end_hour: number
+  queue_enabled: boolean // reminders go through the retrying job queue (see Admin > Reminders)
 }
 
 export const fetchPushSettings = (): Promise<PushSettings> =>
@@ -164,9 +165,30 @@ export interface PromoReport {
   error?: string
 }
 
-// Asks the scheduler to send exactly this promotion now, instead of waiting for its next 5-minute turn.
-export const sendPromoNow = (promoId: string) =>
-  callFunctionWithDetails<{ promos?: PromoReport[] } | null>('push-scheduler', { task: 'promos', promo_id: promoId })
+export type SendNowResult =
+  | { mode: 'queued'; queued: number; skippedCap: number } // put on the queue; the workers send it within moments
+  | { mode: 'direct'; report: { promos?: PromoReport[] } | null } // sent by the scheduler itself (old way)
+
+// The database says the queue is off, or has not been updated to have it yet: use the old way.
+const queueUnavailable = (err: unknown) => {
+  const message = errorMessage(err)
+  return message.includes('QUEUE_DISABLED') || errorCode(err) === 'PGRST202' || message.includes('Could not find the function')
+}
+
+// Sends exactly this promotion now instead of waiting for its scheduled time.
+// With the queue on, the customers are queued and the server is nudged to start straight away (best effort: if
+// the nudge does not arrive, the timer picks the jobs up within minutes). With it off, the scheduler sends them.
+export async function sendPromoNow(promoId: string): Promise<SendNowResult> {
+  try {
+    const planned = await unwrap<{ queued: number; skipped_cap: number }>(supabase.rpc('admin_send_promo_now', { p_promo_id: promoId }))
+    if (planned.queued > 0) callFunctionWithDetails('push-scheduler', { task: 'drain' }).catch(() => {})
+    return { mode: 'queued', queued: planned.queued, skippedCap: planned.skipped_cap }
+  } catch (err) {
+    if (!queueUnavailable(err)) throw err
+    const report = await callFunctionWithDetails<{ promos?: PromoReport[] } | null>('push-scheduler', { task: 'promos', promo_id: promoId })
+    return { mode: 'direct', report }
+  }
+}
 
 export interface PushActivity {
   cart: number

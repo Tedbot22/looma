@@ -50,11 +50,17 @@ Every push and pull request on GitHub runs lint, the tests and the build (see `.
 
 ## Changing the database
 
-1. Write the change as the next numbered file in `supabase/migrations` (for example `0006_...sql`).
+1. Write the change as a new file in `supabase/migrations`, named with the next timestamp (for example `20261201120000_add_something.sql`) so it runs after the ones before it.
 2. Make it safe to run twice (`if not exists`, `create or replace`).
 3. Try it on a Supabase branch or a copy of the project first, then on the live one.
 
 Functions that only the server should run (payments, cancelling, push candidates) are locked to the service role. New functions are private by default; grant access on purpose, only to what needs it.
+
+## Reminders and promotions
+
+Cart reminders, promotions and the "orders are waiting" alert go through a retrying job queue. See
+[docs/reminder-queue.md](docs/reminder-queue.md) for how it works, how to switch it on, and what to do when a reminder
+does not arrive. The owner's view is **Admin > Reminders**. Tests that need a real Postgres run with `npm run test:db`.
 
 ## When something breaks on the live store
 

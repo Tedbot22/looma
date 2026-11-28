@@ -1,26 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import RouteErrorBoundary from '../../components/RouteErrorBoundary'
-import {
-  Bell,
-  ExternalLink,
-  Image as ImageIcon,
-  LayoutDashboard,
-  Menu,
-  MessageCircle,
-  Package,
-  ReceiptText,
-  Settings,
-  ShoppingBag,
-  Star,
-  Tag,
-  Ticket,
-  Truck,
-  Users,
-  Wallet,
-  X,
-  type LucideIcon,
-} from 'lucide-react'
+import { Activity, Bell, ExternalLink, Image as ImageIcon, LayoutDashboard, Menu, MessageCircle, Package, ReceiptText, Settings, ShoppingBag, Star, Tag, Ticket, Truck, type LucideIcon, Users, Wallet, X } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { countNewOrders, countOpenPaymentIssues, countWaitingSupport } from '../../api/adminOrders'
 import { queryKeys } from '../../api/queryKeys'
@@ -95,6 +76,7 @@ export default function AdminLayout() {
       items: [
         { to: '/admin/delivery', label: 'Delivery', icon: Truck },
         { to: '/admin/store', label: 'Store', icon: Settings },
+        { to: '/admin/health', label: 'Reminders', icon: Activity },
       ],
     },
   ]

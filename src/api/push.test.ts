@@ -158,11 +158,55 @@ describe('reminders and promotions', () => {
     expect(steps(fake.calls[0])).toBe('update({"status":"cancelled"}) > eq(id, promo-1) > eq(status, scheduled)')
   })
 
-  it('asks the scheduler to send exactly one promotion now', async () => {
-    fake.onInvoke(async () => ({ data: { promos: [{ id: 'promo-1', delivered: 12 }] }, error: null }))
-    await expect(sendPromoNow('promo-1')).resolves.toEqual({ promos: [{ id: 'promo-1', delivered: 12 }] })
-    expect(fake.calls[0].target).toBe('function:push-scheduler')
-    expect(fake.calls[0].steps[0][1][0]).toEqual({ task: 'promos', promo_id: 'promo-1' })
+  describe('"Send now"', () => {
+    const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+    it('queues the promotion and nudges the server to start straight away (when the queue is on)', async () => {
+      fake.respondWith(() => ({ data: { queued: 12, skipped_cap: 3 } }))
+      fake.onInvoke(async () => ({ data: {}, error: null }))
+      await expect(sendPromoNow('promo-1')).resolves.toEqual({ mode: 'queued', queued: 12, skippedCap: 3 })
+      expect(fake.calls[0]).toMatchObject({ kind: 'rpc', target: 'admin_send_promo_now' })
+      expect(fake.calls[0].steps[0][1][0]).toEqual({ p_promo_id: 'promo-1' })
+      await settle()
+      expect(fake.calls[1].target).toBe('function:push-scheduler')
+      expect(fake.calls[1].steps[0][1][0]).toEqual({ task: 'drain' })
+    })
+
+    it('does not bother the server when there was nobody to queue', async () => {
+      fake.respondWith(() => ({ data: { queued: 0, skipped_cap: 4 } }))
+      await expect(sendPromoNow('promo-1')).resolves.toEqual({ mode: 'queued', queued: 0, skippedCap: 4 })
+      await settle()
+      expect(fake.calls).toHaveLength(1)
+    })
+
+    it('still succeeds if the nudge does not arrive (the timer will pick the jobs up)', async () => {
+      fake.respondWith(() => ({ data: { queued: 2, skipped_cap: 0 } }))
+      fake.onInvoke(async () => {
+        throw new Error('offline')
+      })
+      await expect(sendPromoNow('promo-1')).resolves.toMatchObject({ mode: 'queued', queued: 2 })
+      await settle()
+    })
+
+    it('sends through the scheduler the old way when the queue is switched off', async () => {
+      fake.respondWith(() => ({ error: { message: 'QUEUE_DISABLED' } }))
+      fake.onInvoke(async () => ({ data: { promos: [{ id: 'promo-1', delivered: 12 }] }, error: null }))
+      await expect(sendPromoNow('promo-1')).resolves.toEqual({ mode: 'direct', report: { promos: [{ id: 'promo-1', delivered: 12 }] } })
+      expect(fake.calls[1].target).toBe('function:push-scheduler')
+      expect(fake.calls[1].steps[0][1][0]).toEqual({ task: 'promos', promo_id: 'promo-1' })
+    })
+
+    it('also falls back when the database has not been updated to have the queue yet', async () => {
+      fake.respondWith(() => ({ error: { message: 'Could not find the function public.admin_send_promo_now', code: 'PGRST202' } }))
+      fake.onInvoke(async () => ({ data: { promos: [] }, error: null }))
+      await expect(sendPromoNow('promo-1')).resolves.toMatchObject({ mode: 'direct' })
+    })
+
+    it('does not hide a real problem behind the fallback', async () => {
+      fake.respondWith(() => ({ error: { message: 'NOT_ADMIN', code: '42501' } }))
+      await expect(sendPromoNow('promo-1')).rejects.toMatchObject({ message: 'NOT_ADMIN' })
+      expect(fake.calls).toHaveLength(1) // no function call was made
+    })
   })
 
   it('counts what went out in the last 7 days by kind', async () => {

@@ -108,6 +108,7 @@ export const queryKeys = {
     supportRoot: () => ['admin-support'] as const,
     supportMessages: (chatId: string) => ['admin-support-messages', chatId] as const,
     pushSettings: () => ['push-settings'] as const,
+    jobOverview: () => ['job-overview'] as const,
     promos: () => ['admin-promos'] as const,
     pushActivity: () => ['push-activity'] as const,
     sitePages: () => ['admin-site-pages'] as const,

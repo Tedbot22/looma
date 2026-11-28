@@ -9,6 +9,11 @@
 //   3. Promotions          -> customers: messages the owner scheduled, never more than 1-2 per customer per week.
 //   4. Inactive customers  -> customer: one friendly nudge after 7-14 days away.
 //
+// Two modes, chosen by push_settings.queue_enabled (see supabase/migrations/20261127000000_job_queue.sql):
+//   - off (the default): everything below runs in this one function, as it always has.
+//   - on: the reminders are jobs in a database queue. Each run plans new jobs (plan_all) and then works through
+//         the queue with retries, backoff and a dead-letter list. See "Queue mode" near the end of this file.
+//
 // Who may call it:
 //   - the database timer, with the secret header  x-webhook-secret
 //   - the logged-in admin pressing "Send now" (runs only the promotions job; may pass promo_id to send exactly that one)
@@ -19,6 +24,8 @@
 // plus the optional RESEND_API_KEY, OWNER_EMAIL, SITE_URL for the owner's email copy.
 //@ts-nocheck
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { runJobs, type QueuePort } from '../_shared/jobRunner.ts'
+import { createPushHandlers, type PushDb } from '../_shared/pushJobs.ts'
 
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
@@ -413,6 +420,114 @@ async function isAdmin(authHeader: string | null): Promise<boolean> {
   return !!profile?.is_admin
 }
 
+// ---------------------------------------------------------------------------
+// Queue mode (push_settings.queue_enabled = true)
+//
+// Planning ("who should be reminded") is done in the database by plan_all(). This function then works through
+// the queue. The loop itself is supabase/functions/_shared/jobRunner.ts and what each job does is
+// supabase/functions/_shared/pushJobs.ts; both are plain TypeScript covered by tests. Below is only the wiring
+// to the real database and the real push service.
+// ---------------------------------------------------------------------------
+async function rpc<T>(name: string, args: Record<string, unknown> = {}): Promise<T> {
+  const { data, error } = await supabase.rpc(name, args)
+  if (error) throw new Error(`${name}: ${error.message}`)
+  return data as T
+}
+
+function check<T>(result: { data: T | null; error: { message: string } | null }, what: string): T | null {
+  if (result.error) throw new Error(`${what}: ${result.error.message}`)
+  return result.data
+}
+
+const queuePort: QueuePort = {
+  claim: (worker, limit, lease) => rpc('claim_jobs', { p_worker: worker, p_kinds: null, p_limit: limit, p_lease_seconds: lease }),
+  complete: async (id, worker, result) => (await rpc('complete_job', { p_id: id, p_worker: worker, p_result: result })) === true,
+  fail: (id, worker, error, permanent) => rpc('fail_job', { p_id: id, p_worker: worker, p_error: error, p_permanent: permanent }),
+  defer: async (id, worker, until, reason) =>
+    (await rpc('defer_job', { p_id: id, p_worker: worker, p_run_at: until.toISOString(), p_reason: reason })) === true,
+}
+
+const pushDb: PushDb = {
+  isStale: async (kind, payload) => (await rpc('job_is_stale', { p_kind: kind, p_payload: payload })) === true,
+
+  subscriptionsFor: async (userId) =>
+    check(await supabase.from('customer_push_subscriptions').select('id, subscription').eq('user_id', userId), 'subscriptions') ?? [],
+  deleteSubscription: async (id) => {
+    await supabase.from('customer_push_subscriptions').delete().eq('id', id)
+  },
+  logSent: async (userId, kind, ref) => {
+    check(
+      await supabase.from('push_log').upsert({ user_id: userId, kind, ref }, { onConflict: 'user_id,kind,ref', ignoreDuplicates: true }),
+      'push_log'
+    )
+  },
+
+  ownerDevices: async () => check(await supabase.from('device_tokens').select('id, token'), 'device_tokens') ?? [],
+  deleteOwnerDevice: async (id) => {
+    await supabase.from('device_tokens').delete().eq('id', id)
+  },
+  waitingOrders: async (ids) =>
+    check(
+      await supabase
+        .from('orders')
+        .select('id, order_number, total, payment_method, user_id, created_at')
+        .in('id', ids)
+        .eq('status', 'placed')
+        .is('admin_reminded_at', null),
+      'orders'
+    ) ?? [],
+  customerNames: async (userIds) => {
+    const people = check(await supabase.from('profiles').select('id, full_name').in('id', userIds), 'profiles') ?? []
+    return Object.fromEntries(people.map((p: { id: string; full_name: string | null }) => [p.id, p.full_name]))
+  },
+  markOrdersReminded: async (ids) => {
+    check(await supabase.from('orders').update({ admin_reminded_at: new Date().toISOString() }).in('id', ids), 'orders')
+  },
+}
+
+async function runQueueMode(deadline: number, fromAdmin: boolean, body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  // An older copy of the admin page may still press "Send now" through this function. Start that one promotion
+  // and answer in the shape that page understands.
+  if (fromAdmin) {
+    // "Send now" nudges the server to start straight away: no planning, just work through what is queued.
+    if (body.task === 'drain') return { mode: 'queue', ...(await drainQueue(deadline)) }
+
+    const id = typeof body.promo_id === 'string' ? body.promo_id : null
+    if (!id) return { promos: [] }
+    await supabase.from('promo_messages').update({ scheduled_for: new Date().toISOString() }).eq('id', id).eq('status', 'scheduled')
+    const planned = await rpc<{ queued: number; skipped_cap: number }>('plan_promo', { p_promo_id: id })
+    return {
+      mode: 'queue',
+      promos: [{ id, audience: planned.queued + planned.skipped_cap, skippedCap: planned.skipped_cap, delivered: 0 }],
+    }
+  }
+
+  const planned = await rpc('plan_all')
+  return { mode: 'queue', planned, ...(await drainQueue(deadline)) }
+}
+
+// Works through whatever is due until the queue is empty or time is nearly up.
+// Safe to run at the same time as another run: the database gives each job to only one of them.
+async function drainQueue(deadline: number) {
+  return await runJobs({
+    worker: `scheduler-${crypto.randomUUID().slice(0, 8)}`,
+    queue: queuePort,
+    handlers: createPushHandlers({
+      db: pushDb,
+      siteUrl: Deno.env.get('SITE_URL') ?? undefined,
+      sendEmail,
+      log: (message) => console.error(message),
+      // The push service's refusals carry a statusCode and body, which the handlers read.
+      send: (subscription, payload, options) =>
+        webpush.sendNotification(subscription, JSON.stringify(payload), { TTL: options.ttl, urgency: options.urgency }),
+    }),
+    deadline,
+    batchSize: 20,
+    concurrency: 5,
+    log: (message) => console.error(message),
+  })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405)
@@ -431,6 +546,16 @@ Deno.serve(async (req) => {
 
   const deadline = Date.now() + 100_000 // stay well inside the function's time limit
   const summary: Record<string, unknown> = {}
+
+  // Queue mode: reminders are jobs in the database. (Nothing below this line runs when the queue is on.)
+  if (s.queue_enabled) {
+    try {
+      return json(await runQueueMode(deadline, fromAdmin, body))
+    } catch (err) {
+      console.error('queue run failed:', (err as Error).message)
+      return json({ error: (err as Error).message }, 500)
+    }
+  }
 
   // "Send now" from the admin page only needs the promotions.
   if (fromAdmin || body.task === 'promos') {

@@ -38,3 +38,93 @@ jobs:
           # The build only needs these to exist; no request is made to Supabase while building.
           VITE_SUPABASE_URL: https://example.supabase.co
           VITE_SUPABASE_ANON_KEY: ci-placeholder
+
+  # Tests that need a real Postgres: the reminder queue's SQL (claiming, retries, crash recovery, planners) and the
+  # whole pipeline from the database through the worker. A throwaway database is built from a small copy of the
+  # tables (supabase/tests/fixtures) plus the migration, so nothing here touches your real Supabase project.
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build the test database
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f supabase/tests/fixtures/queue_schema.sql
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f supabase/migrations/20261127000000_job_queue.sql
+          # A second time: a migration must be safe to run again.
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f supabase/migrations/20261127000000_job_queue.sql
+
+      - name: Database tests
+        run: npm run test:db
+
+  # Builds a copy of your PRODUCTION schema (the baseline in supabase/migrations) and applies every later migration
+  # on top, then checks the reminder queue works on it. A migration that would break against production fails here.
+  # The baseline needs some Supabase-only pieces (roles, the auth schema, the scheduler); supabase/tests/fixtures/
+  # platform_stubs.sql stands in for them, so a few "extension is not available" messages while loading are normal.
+  production-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PRODUCTION_SCHEMA_URL: postgres://postgres:postgres@localhost:5432/postgres
+      PGPASSWORD: postgres
+      PGOPTIONS: -c check_function_bodies=off
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build the production schema
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f supabase/tests/fixtures/platform_stubs.sql
+          # The baseline: messages about extensions that only exist on Supabase are expected, so errors do not stop it.
+          psql -h localhost -U postgres -f supabase/migrations/20261126102513_remote_schema.sql || true
+          # Every migration after the baseline, in order. These must apply cleanly, and again.
+          for f in $(ls supabase/migrations/*.sql | sort | grep -v 20261126102513_remote_schema.sql); do
+            echo "applying $f"
+            psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f "$f"
+            psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f "$f"
+          done
+
+      - name: Tests on the production schema
+        run: npx vitest run --config vitest.db.config.ts supabase/tests/productionSchema.db.test.ts
+

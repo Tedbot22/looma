@@ -314,10 +314,10 @@ function PromoPanel() {
     if (!id) return setBusy(false)
 
     // Ask the scheduler to send exactly this promotion right away instead of waiting for its next 5-minute turn.
-    let report: Awaited<ReturnType<typeof sendPromoNow>> = null
+    let result: Awaited<ReturnType<typeof sendPromoNow>> | null = null
     let failure: string | null = null
     try {
-      report = await sendPromoNow(id)
+      result = await sendPromoNow(id)
     } catch (err) {
       failure = errorMessage(err) // the server's own wording, e.g. "401: ..."
     }
@@ -325,8 +325,18 @@ function PromoPanel() {
 
     if (failure !== null) {
       toast.error(`Saved, but it didn't start sending: ${failure}. The timer will retry within 5 minutes.`)
+    } else if (result?.mode === 'queued') {
+      if (result.queued > 0) {
+        toast.success(
+          `Queued for ${result.queued} ${result.queued === 1 ? 'customer' : 'customers'}. It is going out now and takes a minute or two.`
+        )
+      } else if (result.skippedCap > 0) {
+        toast.info(`Everyone eligible (${result.skippedCap} over the weekly limit) was already skipped. Nothing was sent.`)
+      } else {
+        toast.error('Nobody to send to: no customer has notifications turned on (or marketing messages are off for all of them).')
+      }
     } else {
-      const mine = report?.promos?.find((p) => p.id === id)
+      const mine = result?.report?.promos?.find((p) => p.id === id)
       if (!mine) {
         toast.info('Saved. It will go out on the next timer run (within 5 minutes).')
       } else if (mine.error) {
